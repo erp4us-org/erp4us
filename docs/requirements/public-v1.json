@@ -698,9 +698,13 @@
         91,
         93
       ],
-      "prs": [],
+      "prs": [
+        120
+      ],
       "tests": [
-        "tests/integration/inventory.py"
+        "tests/integration/inventory.py",
+        "tests/integration/sales_inventory.py",
+        "tests/integration/material_plan.py"
       ],
       "evidence": []
     },
@@ -1438,7 +1442,7 @@
       "status": "proposed",
       "priority": "P1",
       "milestone": "M3",
-      "revision": 1,
+      "revision": 2,
       "scenarios": [
         "SC-05"
       ],
@@ -1454,9 +1458,15 @@
         23,
         92
       ],
-      "prs": [],
+      "prs": [
+        120
+      ],
       "tests": [
-        "tests/integration/procurement.py"
+        "tests/integration/procurement.py",
+        "tests/integration/procurement_handoff.py",
+        "tests/integration/procurement_terms.py",
+        "tests/integration/procurement_approval.py",
+        "tests/integration/procurement_issuance.py"
       ],
       "evidence": []
     },
@@ -1514,8 +1524,13 @@
         16,
         27
       ],
-      "prs": [],
-      "tests": [],
+      "prs": [
+        120
+      ],
+      "tests": [
+        "tests/integration/sales_drafts.py",
+        "tests/integration/sales_confirmation.py"
+      ],
       "evidence": []
     },
     {

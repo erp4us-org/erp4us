@@ -1,0 +1,177 @@
+[
+  {
+    "code": "CUS-ATLAS",
+    "name": "Atlas Handling Technologies GmbH",
+    "roles": [
+      "customer"
+    ],
+    "profile": {
+      "contact": "Henri Albrecht",
+      "address": {
+        "street": "Fictional Site 1",
+        "postal_code": "45100",
+        "city": "Beispielhafen",
+        "country": "DE"
+      },
+      "delivery_address": {
+        "street": "Fictional Receiving Dock 1",
+        "postal_code": "45100",
+        "city": "Beispielhafen",
+        "country": "DE"
+      },
+      "payment_days": 30,
+      "currency": "EUR",
+      "language": "de"
+    }
+  },
+  {
+    "code": "CUS-BLUEPEAK",
+    "name": "BluePeak Logistics AG",
+    "roles": [
+      "customer"
+    ],
+    "profile": {
+      "contact": "Nele Stern",
+      "address": {
+        "street": "Fictional Site 2",
+        "postal_code": "70100",
+        "city": "Musterfeld",
+        "country": "DE"
+      },
+      "delivery_address": {
+        "street": "Fictional Receiving Dock 2",
+        "postal_code": "70100",
+        "city": "Musterfeld",
+        "country": "DE"
+      },
+      "payment_days": 30,
+      "currency": "EUR",
+      "language": "de"
+    }
+  },
+  {
+    "code": "CUS-WESTBRIDGE",
+    "name": "Westbridge Automation Ltd.",
+    "roles": [
+      "customer"
+    ],
+    "profile": {
+      "contact": "Robin Hale",
+      "address": {
+        "street": "Fictional Site 3",
+        "postal_code": "AB1 0ZZ",
+        "city": "Examplebridge",
+        "country": "GB"
+      },
+      "delivery_address": {
+        "street": "Fictional Receiving Dock 3",
+        "postal_code": "AB1 0ZZ",
+        "city": "Examplebridge",
+        "country": "GB"
+      },
+      "payment_days": 45,
+      "currency": "EUR",
+      "language": "en"
+    }
+  },
+  {
+    "code": "SUP-VECTORDRIVE",
+    "name": "VectorDrive Components GmbH",
+    "roles": [
+      "supplier"
+    ],
+    "profile": {
+      "contact": "Mara Faber",
+      "address": {
+        "street": "Fictional Site 4",
+        "postal_code": "61100",
+        "city": "Beispielhain",
+        "country": "DE"
+      },
+      "delivery_address": {
+        "street": "Fictional Receiving Dock 4",
+        "postal_code": "61100",
+        "city": "Beispielhain",
+        "country": "DE"
+      },
+      "payment_days": 14,
+      "currency": "EUR",
+      "language": "de"
+    }
+  },
+  {
+    "code": "SUP-ALUFORM",
+    "name": "AluForm Materials GmbH",
+    "roles": [
+      "supplier"
+    ],
+    "profile": {
+      "contact": "Levi Sommer",
+      "address": {
+        "street": "Fictional Site 5",
+        "postal_code": "35100",
+        "city": "Musterwald",
+        "country": "DE"
+      },
+      "delivery_address": {
+        "street": "Fictional Receiving Dock 5",
+        "postal_code": "35100",
+        "city": "Musterwald",
+        "country": "DE"
+      },
+      "payment_days": 30,
+      "currency": "EUR",
+      "language": "de"
+    }
+  },
+  {
+    "code": "SUP-PRECISION",
+    "name": "Precision Industrial Parts GmbH",
+    "roles": [
+      "supplier"
+    ],
+    "profile": {
+      "contact": "Lena Berg",
+      "address": {
+        "street": "Fictional Site 6",
+        "postal_code": "91100",
+        "city": "Musterbrück",
+        "country": "DE"
+      },
+      "delivery_address": {
+        "street": "Fictional Receiving Dock 6",
+        "postal_code": "91100",
+        "city": "Musterbrück",
+        "country": "DE"
+      },
+      "payment_days": 21,
+      "currency": "EUR",
+      "language": "de"
+    }
+  },
+  {
+    "code": "SUP-SENSORWORKS",
+    "name": "SensorWorks Europe GmbH",
+    "roles": [
+      "supplier"
+    ],
+    "profile": {
+      "contact": "Ada Winter",
+      "address": {
+        "street": "Fictional Site 7",
+        "postal_code": "21100",
+        "city": "Beispielwerk",
+        "country": "DE"
+      },
+      "delivery_address": {
+        "street": "Fictional Receiving Dock 7",
+        "postal_code": "21100",
+        "city": "Beispielwerk",
+        "country": "DE"
+      },
+      "payment_days": 30,
+      "currency": "EUR",
+      "language": "de"
+    }
+  }
+]

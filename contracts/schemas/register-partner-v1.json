@@ -7,6 +7,7 @@
   "properties": {
     "code": { "type": "string", "minLength": 1, "maxLength": 32, "not": { "pattern": "[^A-Z0-9-]" } },
     "name": { "type": "string", "minLength": 1, "maxLength": 120, "pattern": "[^\\x09-\\x0D\\x20\\x85\\xA0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000]", "not": { "pattern": "[\\x00-\\x1f\\x7f-\\x9f]" } },
-    "roles": { "type": "array", "minItems": 1, "maxItems": 2, "uniqueItems": true, "items": { "enum": ["customer", "supplier"] } }
+    "roles": { "type": "array", "minItems": 1, "maxItems": 2, "uniqueItems": true, "items": { "enum": ["customer", "supplier"] } },
+    "profile": { "$ref": "partner-profile-v1.json" }
   }
 }

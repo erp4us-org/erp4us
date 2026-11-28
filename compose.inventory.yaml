@@ -1,0 +1,95 @@
+x-inventory: &inventory
+  image: ${COMPOSE_PROJECT_NAME:-erp4us}-inventory
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: ["no-new-privileges:true"]
+x-warehouse: &warehouse
+  INVENTORY_TENANT_ID: ddcae139-c1e8-47d2-8b48-349cb6f30ce5
+  INVENTORY_ORGANIZATION_ID: 3e793fb5-75a7-45f6-8f66-45a58fcec674
+  INVENTORY_WAREHOUSE_ID: 49e7372b-0b8d-4363-b610-99ce38348825
+x-inventory-env: &inventory-env
+  INVENTORY_MONGO_URI: mongodb://inventory_app:${DEV_INVENTORY_MONGO_PASSWORD:?Generate a local Inventory password}@mongo:27017/inventory?replicaSet=erp4us&serverSelectionTimeoutMS=3000&w=majority
+
+services:
+  inventory-db-init:
+    image: mongo:8.0.38@sha256:479e85ced54ffb8a40dade1dcde2da2a9ae858515b9415e9cc54bfb8f0575d01
+    entrypoint: ["/bin/sh", "/opt/erp4us/init-inventory-db.sh"]
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: dev_mongo_admin
+      MONGO_INITDB_ROOT_PASSWORD: ${DEV_MONGO_ROOT_PASSWORD:?Run sh scripts/init-dev.sh first}
+      DEV_INVENTORY_MONGO_PASSWORD: ${DEV_INVENTORY_MONGO_PASSWORD:?Generate a local Inventory password}
+    volumes:
+      - ./infrastructure/compose/init-inventory-db.sh:/opt/erp4us/init-inventory-db.sh:ro
+    depends_on:
+      mongo:
+        condition: service_healthy
+  inventory:
+    <<: *inventory
+    build:
+      context: .
+      dockerfile: services/inventory/Dockerfile
+    command: ["serve"]
+    environment:
+      <<: *inventory-env
+      ERP4US_BIND: 0.0.0.0:8093
+      ERP4US_IDENTITY_POLICY: /etc/erp4us/identity-policy.json
+      ERP4US_ISSUER_JWKS: /etc/erp4us/issuer-jwks.json
+    volumes:
+      - type: bind
+        source: ${ERP4US_IDENTITY_DIR:-./.dev-auth}/identity-policy.json
+        target: /etc/erp4us/identity-policy.json
+        read_only: true
+      - type: bind
+        source: ${ERP4US_IDENTITY_DIR:-./.dev-auth}/issuer-jwks.json
+        target: /etc/erp4us/issuer-jwks.json
+        read_only: true
+    ports:
+      - "127.0.0.1:${ERP4US_INVENTORY_PORT:-8093}:8093"
+    depends_on:
+      inventory-db-init:
+        condition: service_completed_successfully
+  inventory-seed:
+    <<: *inventory
+    profiles: ["seed"]
+    command: ["seed-preview"]
+    environment:
+      <<: [*warehouse, *inventory-env]
+    depends_on:
+      inventory-db-init:
+        condition: service_completed_successfully
+  inventory-consumer-init:
+    <<: *inventory
+    command: ["provision-consumer"]
+    environment:
+      <<: *warehouse
+      NATS_URL: nats://nats:4222
+      NATS_PASSWORD: ${DEV_NATS_ADMIN_PASSWORD:?Run sh scripts/init-dev.sh first}
+    depends_on:
+      delivery-init:
+        condition: service_completed_successfully
+  inventory-worker:
+    <<: *inventory
+    command: ["consume"]
+    restart: on-failure
+    environment:
+      <<: [*warehouse, *inventory-env]
+      NATS_URL: nats://nats:4222
+      NATS_PASSWORD: ${DEV_NATS_INVENTORY_PASSWORD:?Generate a local Inventory consumer password}
+    depends_on:
+      inventory-db-init:
+        condition: service_completed_successfully
+      inventory-consumer-init:
+        condition: service_completed_successfully
+  inventory-plan-relay:
+    <<: *inventory
+    command: ["relay-plans"]
+    restart: on-failure
+    environment:
+      <<: [*warehouse, *inventory-env]
+      NATS_URL: nats://nats:4222
+      NATS_PASSWORD: ${DEV_NATS_INVENTORY_PLAN_PASSWORD:?Generate a local Inventory plan relay password}
+    depends_on:
+      inventory-db-init:
+        condition: service_completed_successfully
+      delivery-init:
+        condition: service_completed_successfully

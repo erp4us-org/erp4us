@@ -1,0 +1,97 @@
+openapi: 3.1.0
+info:
+  title: erp4us Manufacturing planning
+  version: 1.0.0
+  description: Read-only gross requirements against a stored, revisioned manufacturing structure. No stock or purchase changes.
+security:
+  - AccessToken: []
+paths:
+  /v1/manufacturing/products:
+    get:
+      operationId: listManufacturingProducts
+      parameters:
+        - $ref: '#/components/parameters/Tenant'
+        - $ref: '#/components/parameters/Organization'
+      responses:
+        '200':
+          description: Products available for planning
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/Product' } }
+        '400': { description: Missing or invalid scope }
+        '401': { description: Missing or invalid access token }
+        '403': { description: No manufacturing.plan.read grant in this scope }
+        '404': { description: No catalog in the authorized scope }
+        '503': { description: Catalog storage unavailable }
+  /v1/manufacturing/requirements:preview:
+    post:
+      operationId: previewGrossRequirements
+      parameters:
+        - $ref: '#/components/parameters/Tenant'
+        - $ref: '#/components/parameters/Organization'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [sku, revision, pieces]
+              properties:
+                sku: { type: string }
+                revision: { type: string }
+                pieces: { type: string, pattern: '^(?:[1-9][0-9]{0,2}|1000)$' }
+      responses:
+        '200':
+          description: Expanded tree and aggregated leaf material quantities
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [sku, revision, pieces, tree, materials]
+                properties:
+                  sku: { type: string }
+                  revision: { type: string }
+                  pieces: { type: string }
+                  tree: { type: array, items: { $ref: '#/components/schemas/Node' } }
+                  materials:
+                    type: array
+                    items:
+                      type: object
+                      required: [sku, name, pieces, unit]
+                      properties:
+                        sku: { type: string }
+                        name: { type: string }
+                        pieces: { type: string, pattern: '^[1-9][0-9]*$' }
+                        unit: { const: EA }
+        '400': { description: Missing or invalid scope or malformed JSON }
+        '401': { description: Missing or invalid access token }
+        '403': { description: No manufacturing.plan.read grant in this scope }
+        '404': { description: Unknown product/revision or catalog in the authorized scope }
+        '409': { description: Inconsistent or cyclic bill of materials }
+        '422': { description: Invalid request data or range }
+        '503': { description: Catalog storage unavailable }
+components:
+  securitySchemes:
+    AccessToken: { type: http, scheme: bearer, bearerFormat: JWT }
+  parameters:
+    Tenant: { name: X-Erp4us-Tenant, in: header, required: true, schema: { type: string, format: uuid } }
+    Organization: { name: X-Erp4us-Organization, in: header, required: true, schema: { type: string, format: uuid } }
+  schemas:
+    Product:
+      type: object
+      required: [sku, name, revision, price_eur]
+      properties:
+        sku: { type: string }
+        name: { type: string }
+        revision: { type: string }
+        price_eur: { type: string, pattern: '^[0-9]+\.[0-9]{2}$' }
+    Node:
+      type: object
+      required: [sku, name, pieces, revision, children]
+      properties:
+        sku: { type: string }
+        name: { type: string }
+        pieces: { type: string, pattern: '^[1-9][0-9]*$' }
+        revision: { type: [string, 'null'] }
+        children: { type: array, items: { $ref: '#/components/schemas/Node' } }

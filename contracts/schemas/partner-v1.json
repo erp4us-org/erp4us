@@ -12,6 +12,7 @@
     "revision": { "type": "integer", "minimum": 1 },
     "code": { "$ref": "register-partner-v1.json#/properties/code" },
     "name": { "$ref": "register-partner-v1.json#/properties/name" },
-    "roles": { "$ref": "register-partner-v1.json#/properties/roles" }
+    "roles": { "$ref": "register-partner-v1.json#/properties/roles" },
+    "profile": { "$ref": "partner-profile-v1.json" }
   }
 }

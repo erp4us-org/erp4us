@@ -1,0 +1,10 @@
+# Opt in with an explicitly selected local policy. The base overlay has no default.
+services:
+  procurement:
+    environment:
+      ERP4US_PROCUREMENT_BUDGET_POLICY: /etc/erp4us/budget-policy.json
+    volumes:
+      - type: bind
+        source: ${ERP4US_PROCUREMENT_BUDGET_POLICY_FILE:?Select an approved budget policy file}
+        target: /etc/erp4us/budget-policy.json
+        read_only: true

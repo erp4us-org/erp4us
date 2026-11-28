@@ -1,15 +1,14 @@
-use crate::domain::Scope;
 use axum::http::{HeaderMap, header};
 use jsonwebtoken::{
     Algorithm, DecodingKey, Validation, decode, decode_header,
     jwk::{AlgorithmParameters, JwkSet, KeyAlgorithm, PublicKeyUse},
 };
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, fs::File, io, sync::Arc};
 use uuid::Uuid;
 
 #[derive(Clone)]
-pub(crate) struct Auth(Arc<Policy>);
+pub struct Auth(Arc<Policy>);
 
 struct Policy {
     keys: HashMap<String, DecodingKey>,
@@ -25,35 +24,29 @@ struct Config {
     principals: HashMap<String, Principal>,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
-struct Principal {
+pub struct Principal {
     actor_id: Uuid,
     grants: Vec<Grant>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    platform_permissions: Vec<String>,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 struct Grant {
     tenant_id: Uuid,
     organization_id: Uuid,
-    permissions: Vec<Permission>,
+    permissions: Vec<String>,
 }
 
-#[derive(Clone, Copy, PartialEq, Deserialize)]
-pub(crate) enum Permission {
-    #[serde(rename = "master-data.article.read")]
-    Read,
-    #[serde(rename = "master-data.article.register")]
-    Register,
-    #[serde(rename = "master-data.unit.read")]
-    ReadUnit,
-    #[serde(rename = "master-data.unit.register")]
-    RegisterUnit,
-    #[serde(rename = "master-data.partner.read")]
-    ReadPartner,
-    #[serde(rename = "master-data.partner.register")]
-    RegisterPartner,
+/// An actor and scope established by a verified access token and an operator grant.
+#[derive(Clone, Copy, Debug)]
+pub struct Scope {
+    pub tenant: Uuid,
+    pub organization: Uuid,
+    pub actor: Uuid,
 }
 
 #[derive(Deserialize)]
@@ -63,17 +56,17 @@ struct Claims {
     kind: Option<String>,
 }
 
-pub(crate) enum Denial {
+pub enum Denial {
     Unauthenticated,
     InvalidScope,
     Forbidden,
 }
 
-pub(crate) const TENANT_HEADER: &str = "x-erp4us-tenant";
-pub(crate) const ORGANIZATION_HEADER: &str = "x-erp4us-organization";
+pub const TENANT_HEADER: &str = "x-erp4us-tenant";
+pub const ORGANIZATION_HEADER: &str = "x-erp4us-organization";
 
 impl Auth {
-    pub(crate) fn load(config_path: &str, jwks_path: &str) -> io::Result<Self> {
+    pub fn load(config_path: &str, jwks_path: &str) -> io::Result<Self> {
         let config: Config = read_json(config_path, "Invalid identity policy")?;
         let jwks: JwkSet = read_json(jwks_path, "Invalid issuer JWKS")?;
         if !config.issuer.starts_with("https://")
@@ -129,11 +122,7 @@ impl Auth {
         })))
     }
 
-    pub(crate) fn authorize(
-        &self,
-        headers: &HeaderMap,
-        permission: Permission,
-    ) -> Result<Scope, Denial> {
+    pub fn authenticate(&self, headers: &HeaderMap) -> Result<&Principal, Denial> {
         let (scheme, token) = one_header(headers, header::AUTHORIZATION.as_str())
             .and_then(|value| value.split_once(' '))
             .ok_or(Denial::Unauthenticated)?;
@@ -157,17 +146,20 @@ impl Auth {
         if !access_token || claims.sub.is_empty() {
             return Err(Denial::Unauthenticated);
         }
+        self.0.principals.get(&claims.sub).ok_or(Denial::Forbidden)
+    }
+
+    pub fn authorize(&self, headers: &HeaderMap, permission: &str) -> Result<Scope, Denial> {
+        let principal = self.authenticate(headers)?;
         let tenant = scope_header(headers, TENANT_HEADER)?;
         let organization = scope_header(headers, ORGANIZATION_HEADER)?;
-        let principal = self
-            .0
-            .principals
-            .get(&claims.sub)
-            .ok_or(Denial::Forbidden)?;
         if !principal.grants.iter().any(|grant| {
             grant.tenant_id == tenant
                 && grant.organization_id == organization
-                && grant.permissions.contains(&permission)
+                && grant
+                    .permissions
+                    .iter()
+                    .any(|allowed| allowed == permission)
         }) {
             return Err(Denial::Forbidden);
         }
@@ -176,6 +168,16 @@ impl Auth {
             organization,
             actor: principal.actor_id,
         })
+    }
+
+    pub fn authorize_platform(&self, headers: &HeaderMap, permission: &str) -> Result<(), Denial> {
+        let principal = self.authenticate(headers)?;
+        principal
+            .platform_permissions
+            .iter()
+            .any(|grant| grant == permission)
+            .then_some(())
+            .ok_or(Denial::Forbidden)
     }
 }
 

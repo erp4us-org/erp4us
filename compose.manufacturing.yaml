@@ -1,0 +1,72 @@
+services:
+  manufacturing-db-init:
+    image: mongo:8.0.38@sha256:479e85ced54ffb8a40dade1dcde2da2a9ae858515b9415e9cc54bfb8f0575d01
+    entrypoint: ["/bin/sh", "/opt/erp4us/init-manufacturing-db.sh"]
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: dev_mongo_admin
+      MONGO_INITDB_ROOT_PASSWORD: ${DEV_MONGO_ROOT_PASSWORD:?Run sh scripts/init-dev.sh first}
+      DEV_MANUFACTURING_MONGO_PASSWORD: ${DEV_MANUFACTURING_MONGO_PASSWORD:?Generate the manufacturing database password}
+    volumes:
+      - ./infrastructure/compose/init-manufacturing-db.sh:/opt/erp4us/init-manufacturing-db.sh:ro
+    depends_on:
+      mongo:
+        condition: service_healthy
+  manufacturing:
+    image: ${COMPOSE_PROJECT_NAME:-erp4us}-manufacturing
+    build:
+      context: .
+      dockerfile: services/manufacturing/Dockerfile
+    environment:
+      <<: &manufacturing-db
+        MANUFACTURING_MONGODB_URI: mongodb://manufacturing_app:${DEV_MANUFACTURING_MONGO_PASSWORD:?Generate the manufacturing database password}@mongo:27017/manufacturing?replicaSet=erp4us&serverSelectionTimeoutMS=3000&w=majority
+      ERP4US_BIND: 0.0.0.0:8090
+      ERP4US_IDENTITY_POLICY: /etc/erp4us/identity-policy.json
+      ERP4US_ISSUER_JWKS: /etc/erp4us/issuer-jwks.json
+    volumes:
+      - type: bind
+        source: ${ERP4US_IDENTITY_DIR:-./.dev-auth}/identity-policy.json
+        target: /etc/erp4us/identity-policy.json
+        read_only: true
+      - type: bind
+        source: ${ERP4US_IDENTITY_DIR:-./.dev-auth}/issuer-jwks.json
+        target: /etc/erp4us/issuer-jwks.json
+        read_only: true
+    depends_on:
+      manufacturing-db-init:
+        condition: service_completed_successfully
+    ports:
+      - "127.0.0.1:${ERP4US_MANUFACTURING_PORT:-8090}:8090"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+  manufacturing-seed:
+    profiles: ["seed"]
+    image: ${COMPOSE_PROJECT_NAME:-erp4us}-manufacturing
+    command: ["seed-preview"]
+    environment:
+      <<: *manufacturing-db
+      ERP4US_SEED_TENANT: ddcae139-c1e8-47d2-8b48-349cb6f30ce5
+      ERP4US_SEED_ORGANIZATION: 3e793fb5-75a7-45f6-8f66-45a58fcec674
+    depends_on:
+      manufacturing-db-init:
+        condition: service_completed_successfully
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+  master-data-seed:
+    profiles: ["seed"]
+    image: ${ERP4US_MASTER_DATA_IMAGE:-${COMPOSE_PROJECT_NAME:-erp4us}-master-data}
+    command: ["seed-preview-partners"]
+    environment:
+      MASTER_DATA_MONGODB_URI: mongodb://master_data_app:${DEV_MASTER_DATA_PASSWORD:?Run sh scripts/init-dev.sh first}@mongo:27017/master_data?replicaSet=erp4us&serverSelectionTimeoutMS=3000&w=majority
+      ERP4US_SEED_TENANT: ddcae139-c1e8-47d2-8b48-349cb6f30ce5
+      ERP4US_SEED_ORGANIZATION: 3e793fb5-75a7-45f6-8f66-45a58fcec674
+      ERP4US_SEED_ACTOR: "242a290f-4bbc-438e-aefe-e3697a8bcd16"
+    depends_on:
+      mongo:
+        condition: service_healthy
+      mongo-init:
+        condition: service_completed_successfully
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]

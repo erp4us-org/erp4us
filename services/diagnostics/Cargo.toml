@@ -1,0 +1,22 @@
+[package]
+name = "diagnostics"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+publish = false
+license.workspace = true
+
+[dependencies]
+axum = "=0.8.9"
+erp4us-identity.workspace = true
+erp4us-messaging.workspace = true
+futures-util = "=0.3.32"
+http-body-util = "=0.1.5"
+hyper = { version = "=1.12.0", features = ["client", "http1"] }
+hyper-util = { version = "=0.1.21", features = ["tokio"] }
+serde.workspace = true
+serde_json.workspace = true
+tokio = { version = "=1.54.1", features = ["macros", "rt-multi-thread", "net", "time", "io-util", "sync"] }
+tracing = "=0.1.44"
+tracing-subscriber = { version = "=0.3.23", features = ["json"] }
+uuid.workspace = true

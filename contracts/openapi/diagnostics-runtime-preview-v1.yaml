@@ -1,0 +1,187 @@
+openapi: 3.1.0
+info:
+  title: erp4us proposed runtime diagnostics preview
+  version: 0.1.0
+  description: >
+    UI and fixture proposal for issue #122, not an implemented API or an approved trust decision.
+    The intended source is a bounded, sanitized artifact from an optional observer for the fixed local
+    preview project. No route, observer, grant provisioning, proxy or runtime control is provided here.
+    Do not derive runtime state from HTTP, NATS or application heartbeats. Bound each JSON
+    response body to 64 KiB in addition to the page and record shape limits.
+x-preview-proposed: true
+externalDocs:
+  description: Unapproved host-observer boundary proposal for issue #122
+  url: https://github.com/erp4us-org/erp4us/issues/122#issuecomment-7236971940
+security:
+  - AccessToken: []
+paths:
+  /v1/admin/runtime:
+    get:
+      operationId: readPreviewRuntime
+      description: >
+        Requires exactly platform.runtime.read on the verified platform principal. A tenant or
+        organization grant does not apply. No target, query, or scope selectors are accepted.
+      responses:
+        '200':
+          description: Current observation state. An unavailable artifact is not an empty inventory.
+          headers:
+            Cache-Control: { $ref: '#/components/headers/NoStore' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RuntimeReport' }
+        '401': { description: No verified access token }
+        '403': { description: Missing platform runtime grant }
+        '503': { description: Reporting endpoint unavailable }
+  /v1/admin/diagnostic-logs:
+    get:
+      operationId: readPreviewDiagnosticLogs
+      description: >
+        Requires exactly platform.logs.read on the verified platform principal; no implication from
+        health, runtime, tenant or organization grants. Sources are fixed by this contract. Reject
+        unknown query parameters, including host, container, source path, URL, tenant, or engine filters.
+        The proposed sanitized retention ceiling is 24 hours or 5 MiB total, whichever comes first.
+        Collectors must drop unrecognized, free-form and oversized lines before retention. No raw
+        log text, IDs, fields from payloads, credentials, or command inputs are served.
+      parameters:
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 100 }
+        - name: cursor
+          in: query
+          description: >
+            Omit to load the newest retained page. Otherwise submit one opaque server-issued cursor,
+            either the before cursor for an earlier page or the after cursor for the next records
+            in retention order. The server binds cursors to the authorized platform principal and
+            observation scope, rechecks authorization on every read and validates direction and expiry.
+          schema: { $ref: '#/components/schemas/Cursor' }
+      responses:
+        '200':
+          description: A bounded page (possibly empty) or a null page when the source is unavailable.
+          headers:
+            Cache-Control: { $ref: '#/components/headers/NoStore' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LogReport' }
+        '400': { description: Invalid query or cursor }
+        '401': { description: No verified access token }
+        '403': { description: Missing platform logs grant }
+        '410':
+          description: >
+            Cursor can no longer continue the same window because of retention or an observer
+            discontinuity. Discard cursor and rows; restart with an unanchored read and indicate a gap.
+        '503': { description: Reporting endpoint unavailable }
+components:
+  headers:
+    NoStore:
+      required: true
+      schema: { const: no-store }
+  securitySchemes:
+    AccessToken: { type: http, scheme: bearer, bearerFormat: JWT }
+  schemas:
+    Timestamp:
+      description: UTC milliseconds since the Unix epoch, at most the end of year 9999.
+      type: integer
+      minimum: 0
+      maximum: 253402300799999
+    RuntimeState:
+      type: string
+      enum: [present_running, present_exited, absent]
+      description: >
+        A direct observation of a running or exited service, or absence from the fixed project.
+        Report absence only after a fresh scan completed for the full allowlist. Do not coerce
+        partial results, unsupported runtime states or similarly named services in another project.
+    RuntimeReport:
+      oneOf:
+        - type: object
+          additionalProperties: false
+          required: [state, observed_at_unix_ms, expires_at_unix_ms, services]
+          properties:
+            state: { const: fresh, description: A complete successful scan of the fixed allowlist. }
+            observed_at_unix_ms: { $ref: '#/components/schemas/Timestamp' }
+            expires_at_unix_ms:
+              $ref: '#/components/schemas/Timestamp'
+              description: Strictly later than the scan time by at most 30 seconds. Clients stop showing current states on expiry.
+            services:
+              description: Initial proposed long-running service subset; excludes other projects and one-shot jobs.
+              type: object
+              additionalProperties: false
+              required: [master-data, manufacturing, article-relay]
+              properties:
+                master-data: { $ref: '#/components/schemas/RuntimeState' }
+                manufacturing: { $ref: '#/components/schemas/RuntimeState' }
+                article-relay: { $ref: '#/components/schemas/RuntimeState' }
+        - type: object
+          additionalProperties: false
+          required: [state, observed_at_unix_ms, expires_at_unix_ms, services]
+          properties:
+            state: { const: stale, description: A previously complete scan can no longer support a current observation. }
+            observed_at_unix_ms: { $ref: '#/components/schemas/Timestamp' }
+            expires_at_unix_ms: { type: 'null' }
+            services: { type: 'null' }
+        - type: object
+          additionalProperties: false
+          required: [state, observed_at_unix_ms, expires_at_unix_ms, services]
+          properties:
+            state: { const: unavailable, description: No usable scan, including a missing or unreadable source. }
+            observed_at_unix_ms: { type: 'null' }
+            expires_at_unix_ms: { type: 'null' }
+            services: { type: 'null' }
+    Cursor:
+      type: string
+      minLength: 1
+      maxLength: 256
+      not: { pattern: '[^A-Za-z0-9_-]' }
+      description: Opaque base64url-alphabet token. Never display or persist it in the browser.
+    LogReport:
+      oneOf:
+        - type: object
+          additionalProperties: false
+          required: [state, page]
+          properties:
+            state: { const: available }
+            page: { $ref: '#/components/schemas/LogPage' }
+        - type: object
+          additionalProperties: false
+          required: [state, page]
+          properties:
+            state: { const: unavailable }
+            page: { type: 'null' }
+    LogPage:
+      type: object
+      additionalProperties: false
+      required: [records, before_cursor, after_cursor, gap_before]
+      properties:
+        records:
+          description: >
+            At most the requested limit. Ordered oldest to newest by observation order, independent
+            of producer clocks. For an after cursor, return the first unread records without overlap
+            (including an empty page if caught up); do not jump to the latest page silently. Do not
+            span a retention or collector gap within a page.
+          type: array
+          maxItems: 100
+          items: { $ref: '#/components/schemas/LogRecord' }
+        before_cursor:
+          description: Cursor for the prior retained page, or null when no earlier page is available.
+          oneOf: [{ $ref: '#/components/schemas/Cursor' }, { type: 'null' }]
+        after_cursor:
+          description: Cursor after the last record (or the anchored position for an empty page).
+          $ref: '#/components/schemas/Cursor'
+        gap_before:
+          description: Known interruption or retention gap immediately before this page, including an empty anchored page.
+          type: boolean
+    LogRecord:
+      type: object
+      additionalProperties: false
+      required: [observed_at_unix_ms, service, severity, code]
+      properties:
+        observed_at_unix_ms: { $ref: '#/components/schemas/Timestamp' }
+        service: { enum: [manufacturing, article-relay] }
+        severity: { enum: [info, warning, error] }
+        code: { enum: [plan_read_unavailable, relay_connected, relay_delivery_delayed] }
+      oneOf:
+        - properties:
+            service: { const: manufacturing }
+            code: { const: plan_read_unavailable }
+        - properties:
+            service: { const: article-relay }
+            code: { enum: [relay_connected, relay_delivery_delayed] }

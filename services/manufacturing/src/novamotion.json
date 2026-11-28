@@ -1,0 +1,126 @@
+{
+  "products": [
+    {
+      "sku": "NM-1000",
+      "name": "NovaMotion Linear Module 1000",
+      "revision": "A",
+      "price_eur": "2490.00"
+    },
+    {
+      "sku": "NM-2000",
+      "name": "NovaMotion Frame Kit 2000",
+      "revision": "A",
+      "price_eur": "890.00"
+    }
+  ],
+  "recipes": [
+    {
+      "sku": "NM-1000",
+      "revision": "A",
+      "components": [
+        {
+          "sku": "NM-1100",
+          "name": "Base frame assembly",
+          "pieces": 1,
+          "revision": "A"
+        },
+        {
+          "sku": "NM-1200",
+          "name": "Drive assembly",
+          "pieces": 1,
+          "revision": "A"
+        },
+        {
+          "sku": "NM-RAIL",
+          "name": "Linear rail",
+          "pieces": 2,
+          "revision": null
+        },
+        {
+          "sku": "NM-SENSOR",
+          "name": "Position sensor",
+          "pieces": 2,
+          "revision": null
+        },
+        {
+          "sku": "NM-CABLE",
+          "name": "Cable kit",
+          "pieces": 1,
+          "revision": null
+        },
+        {
+          "sku": "NM-PACK",
+          "name": "Packaging kit",
+          "pieces": 1,
+          "revision": null
+        }
+      ]
+    },
+    {
+      "sku": "NM-1100",
+      "revision": "A",
+      "components": [
+        {
+          "sku": "NM-PROFILE",
+          "name": "Aluminium profile",
+          "pieces": 2,
+          "revision": null
+        },
+        {
+          "sku": "NM-ENDPLATE",
+          "name": "End plate",
+          "pieces": 2,
+          "revision": null
+        },
+        {
+          "sku": "NM-SCREW",
+          "name": "Fastening screw",
+          "pieces": 12,
+          "revision": null
+        }
+      ]
+    },
+    {
+      "sku": "NM-1200",
+      "revision": "A",
+      "components": [
+        {
+          "sku": "NM-MOTOR",
+          "name": "Servo motor",
+          "pieces": 1,
+          "revision": null
+        },
+        {
+          "sku": "NM-COUPLING",
+          "name": "Coupling",
+          "pieces": 1,
+          "revision": null
+        },
+        {
+          "sku": "NM-SPINDLE",
+          "name": "Drive spindle",
+          "pieces": 1,
+          "revision": null
+        }
+      ]
+    },
+    {
+      "sku": "NM-2000",
+      "revision": "A",
+      "components": [
+        {
+          "sku": "NM-1100",
+          "name": "Base frame assembly",
+          "pieces": 1,
+          "revision": "A"
+        },
+        {
+          "sku": "NM-PACK",
+          "name": "Packaging kit",
+          "pieces": 1,
+          "revision": null
+        }
+      ]
+    }
+  ]
+}

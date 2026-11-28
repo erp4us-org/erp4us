@@ -93,10 +93,11 @@ jobs:
     needs: impact
     if: ${{ !cancelled() && (needs.impact.result != 'success' || needs.impact.outputs.compose != 'false') }}
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 35
     env:
       COMPOSE_PROJECT_NAME: erp4us-ci
       ERP4US_HEARTBEAT_SECONDS: "2"
+      ERP4US_PROCUREMENT_BUDGET_POLICY_FILE: ./contracts/examples/procurement/budget-policy-v1.json
       DOCKER_BUILD_RECORD_UPLOAD: "false"
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -132,11 +133,91 @@ jobs:
       - run: docker compose -f compose.yaml -f compose.delivery.yaml up --no-build -d
       - run: python3 tests/integration/delivery.py
       - run: python3 tests/integration/config.py
+      - name: Build Manufacturing release image
+        uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6.18.0
+        with:
+          context: .
+          file: services/manufacturing/Dockerfile
+          tags: erp4us-ci-manufacturing:latest
+          load: true
+          cache-from: type=gha,scope=manufacturing-${{ env.CACHE_NAMESPACE }}
+          cache-to: ${{ github.ref == 'refs/heads/main' && format('type=gha,mode=max,ignore-error=true,scope=manufacturing-{0}', env.CACHE_NAMESPACE) || '' }}
+      - name: Build Diagnostics release image
+        uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6.18.0
+        with:
+          context: .
+          file: services/diagnostics/Dockerfile
+          tags: erp4us-ci-diagnostics:latest
+          load: true
+          cache-from: type=gha,scope=diagnostics-${{ env.CACHE_NAMESPACE }}
+          cache-to: ${{ github.ref == 'refs/heads/main' && format('type=gha,mode=max,ignore-error=true,scope=diagnostics-{0}', env.CACHE_NAMESPACE) || '' }}
+      - name: Build Sales release image
+        uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6.18.0
+        with:
+          context: .
+          file: services/sales/Dockerfile
+          tags: erp4us-ci-sales:latest
+          load: true
+          cache-from: type=gha,scope=sales-${{ env.CACHE_NAMESPACE }}
+          cache-to: ${{ github.ref == 'refs/heads/main' && format('type=gha,mode=max,ignore-error=true,scope=sales-{0}', env.CACHE_NAMESPACE) || '' }}
+      - name: Build Inventory release image
+        uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6.18.0
+        with:
+          context: .
+          file: services/inventory/Dockerfile
+          tags: erp4us-ci-inventory:latest
+          load: true
+          cache-from: type=gha,scope=inventory-${{ env.CACHE_NAMESPACE }}
+          cache-to: ${{ github.ref == 'refs/heads/main' && format('type=gha,mode=max,ignore-error=true,scope=inventory-{0}', env.CACHE_NAMESPACE) || '' }}
+      - name: Build Procurement release image
+        uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6.18.0
+        with:
+          context: .
+          file: services/procurement/Dockerfile
+          tags: erp4us-ci-procurement:latest
+          load: true
+          cache-from: type=gha,scope=procurement-${{ env.CACHE_NAMESPACE }}
+          cache-to: ${{ github.ref == 'refs/heads/main' && format('type=gha,mode=max,ignore-error=true,scope=procurement-{0}', env.CACHE_NAMESPACE) || '' }}
+      - name: Seed and exercise the scoped Manufacturing API
+        run: |
+          compose() { docker compose -f compose.yaml -f compose.delivery.yaml -f compose.manufacturing.yaml "$@"; }
+          compose up --no-build -d manufacturing
+          compose run --rm manufacturing-seed
+          compose run --rm manufacturing-seed
+          compose run --rm master-data-seed
+          compose run --rm master-data-seed
+          python3 tests/integration/manufacturing.py
+          python3 tests/integration/preview_partners.py
+      - name: Exercise platform diagnostics and relay heartbeats across a stop and restart
+        run: |
+          docker compose -f compose.yaml -f compose.delivery.yaml -f compose.manufacturing.yaml -f compose.diagnostics.yaml up --no-build -d diagnostics
+          python3 tests/integration/diagnostics.py
+      - name: Exercise scoped Sales order drafts with the live catalog owners
+        run: |
+          docker compose -f compose.yaml -f compose.manufacturing.yaml -f compose.sales.yaml up --no-build -d sales
+          python3 tests/integration/sales_drafts.py
+      - name: Exercise durable Sales confirmation across a broker outage
+        run: |
+          docker compose -f compose.yaml -f compose.delivery.yaml -f compose.manufacturing.yaml -f compose.sales.yaml -f compose.sales-events.yaml up --no-build -d sales-relay
+          python3 tests/integration/sales_confirmation.py
+      - name: Exercise Sales-to-Inventory reservation, scope and replay
+        run: |
+          compose() { docker compose -f compose.yaml -f compose.delivery.yaml -f compose.manufacturing.yaml -f compose.sales.yaml -f compose.sales-events.yaml -f compose.inventory.yaml "$@"; }
+          compose up --no-build -d inventory
+          compose run --rm -T inventory-seed
+          compose up --no-build -d inventory-worker
+          python3 tests/integration/sales_inventory.py
+      - name: Prove material plans and explicitly issue an approved local purchase
+        run: |
+          docker compose -f compose.yaml -f compose.delivery.yaml -f compose.manufacturing.yaml -f compose.sales.yaml -f compose.sales-events.yaml -f compose.inventory.yaml -f compose.procurement.yaml -f compose.procurement-approvals.yaml \
+            up --no-build -d inventory-plan-relay procurement procurement-worker
+          ERP4US_PROCUREMENT_E2E=1 ERP4US_PURCHASE_TERMS_E2E=1 ERP4US_PIPELINE_DIAGNOSTICS_E2E=1 ERP4US_BUDGET_APPROVAL_E2E=1 ERP4US_PURCHASE_ISSUANCE_E2E=1 \
+            python3 tests/integration/material_plan.py
       - name: Scan built service images
         run: |
           sh scripts/install-dependency-scanner.sh trivy "$RUNNER_TEMP/tools"
-          for service in master-data article-relay; do
-            container=$(docker compose -f compose.yaml -f compose.delivery.yaml ps -q "$service")
+          for service in master-data article-relay manufacturing diagnostics sales inventory procurement; do
+            container=$(docker compose -f compose.yaml -f compose.delivery.yaml -f compose.manufacturing.yaml -f compose.diagnostics.yaml -f compose.sales.yaml -f compose.inventory.yaml -f compose.procurement.yaml ps -q "$service")
             image=$(docker inspect --format '{{.Config.Image}}' "$container")
             "$RUNNER_TEMP/tools/trivy" image --image-src docker --scanners vuln --severity HIGH,CRITICAL \
               --format json --output "$RUNNER_TEMP/trivy.json" "$image"
@@ -152,6 +233,12 @@ jobs:
           path: ~/.npm/_cacache
           key: npm-${{ env.CACHE_NAMESPACE }}-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('ui/.nvmrc', 'ui/package-lock.json') }}
       - name: Build and exercise the Article workspace
+        env:
+          ERP4US_MANUFACTURING_E2E: '1'
+          ERP4US_SALES_E2E: '1'
+          ERP4US_PROCUREMENT_E2E: '1'
+          ERP4US_PURCHASE_TERMS_E2E: '1'
+          ERP4US_BUDGET_APPROVAL_E2E: '1'
         working-directory: ui
         run: |
           npm ci
@@ -159,6 +246,44 @@ jobs:
           npm run build
           npx playwright install --with-deps chromium
           npm run test:e2e
+      - name: Run real preview login and wrong-tenant browser checks
+        env:
+          ERP4US_PORT: '8180'
+          ERP4US_MANUFACTURING_PORT: '8190'
+          ERP4US_DIAGNOSTICS_PORT: '8191'
+          ERP4US_SALES_PORT: '8192'
+          ERP4US_INVENTORY_PORT: '8193'
+          ERP4US_PROCUREMENT_PORT: '8194'
+          ERP4US_IDENTITY_DIR: ./.erp4us-preview
+          ERP4US_REAL_OIDC_E2E: '1'
+          ERP4US_PURCHASE_TERMS_E2E: '1'
+          ERP4US_PREVIEW_BUDGET_APPROVALS: '1'
+          ERP4US_BUDGET_APPROVAL_E2E: '1'
+          ERP4US_PREVIEW_PURCHASE_ISSUANCE: '1'
+          ERP4US_PURCHASE_ISSUANCE_E2E: '1'
+        run: |
+          python3 scripts/preview-identity.py prepare
+          jq -r 'to_entries[].value | "::add-mask::" + .' .erp4us-preview/credentials.json
+          docker tag erp4us-ci-master-data erp4us-ci-identity-master-data
+          docker tag erp4us-ci-manufacturing erp4us-ci-identity-manufacturing
+          docker tag erp4us-ci-diagnostics erp4us-ci-identity-diagnostics
+          docker tag erp4us-ci-article-delivery erp4us-ci-identity-article-delivery
+          docker tag erp4us-ci-sales erp4us-ci-identity-sales
+          docker tag erp4us-ci-inventory erp4us-ci-identity-inventory
+          docker tag erp4us-ci-procurement erp4us-ci-identity-procurement
+          preview() { docker compose -p erp4us-ci-identity -f compose.yaml -f compose.delivery.yaml -f compose.manufacturing.yaml -f compose.preview-identity.yaml -f compose.diagnostics.yaml -f compose.sales.yaml -f compose.sales-events.yaml -f compose.inventory.yaml -f compose.procurement.yaml -f compose.procurement-approvals.yaml "$@"; }
+          preview up -d preview-identity
+          python3 scripts/preview-identity.py configure
+          preview up --no-build -d --wait nats
+          # A foreground one-shot returns the initializer's exit status even if
+          # it exits before Compose could attach a separate wait operation.
+          preview run --rm --no-deps -T delivery-init
+          preview up --no-build -d master-data manufacturing sales sales-relay diagnostics inventory procurement article-relay
+          preview run --rm manufacturing-seed
+          preview run --rm master-data-seed
+          preview run --rm -T inventory-seed
+          preview up --no-build -d inventory-worker inventory-plan-relay procurement-worker
+          npm --prefix ui run test:e2e -- tests/preview-signin.spec.ts
       - name: Save trusted npm download cache
         if: github.ref == 'refs/heads/main' && steps.npm-cache.outputs.cache-hit != 'true'
         uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
@@ -166,9 +291,16 @@ jobs:
           path: ~/.npm/_cacache
           key: ${{ steps.npm-cache.outputs.cache-primary-key }}
       - if: failure()
-        run: docker compose -f compose.yaml -f compose.delivery.yaml logs --no-color --tail=80
+        run: docker compose -f compose.yaml -f compose.delivery.yaml -f compose.manufacturing.yaml -f compose.diagnostics.yaml -f compose.sales.yaml -f compose.sales-events.yaml -f compose.inventory.yaml -f compose.procurement.yaml logs --no-color --tail=80
       - if: always()
-        run: if [ -f .env ]; then docker compose -f compose.yaml -f compose.delivery.yaml down -v; fi
+        run: if [ -f .env ]; then docker compose -f compose.yaml -f compose.delivery.yaml -f compose.manufacturing.yaml -f compose.diagnostics.yaml -f compose.sales.yaml -f compose.sales-events.yaml -f compose.inventory.yaml -f compose.procurement.yaml down -v; fi
+      - if: always()
+        env:
+          ERP4US_IDENTITY_DIR: ./.erp4us-preview
+        run: |
+          if [ -f .erp4us-preview/identity-policy.json ]; then
+            docker compose -p erp4us-ci-identity -f compose.yaml -f compose.delivery.yaml -f compose.manufacturing.yaml -f compose.preview-identity.yaml -f compose.diagnostics.yaml -f compose.sales.yaml -f compose.sales-events.yaml -f compose.inventory.yaml -f compose.procurement.yaml down -v
+          fi
   audit:
     needs: impact
     if: ${{ !cancelled() && (needs.impact.result != 'success' || needs.impact.outputs.audit != 'false') }}

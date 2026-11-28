@@ -2,7 +2,7 @@ use crate::{
     ConnectOptions, Contract, Delivery, Envelope, Error, Kind, Message, Scope, State, Subscriber,
 };
 use async_nats::jetstream::{self, context::PublishAckFuture, publish::PublishAck};
-use std::time::Duration;
+use std::{sync::atomic::Ordering, time::Duration};
 
 #[derive(Clone)]
 pub struct Connection(async_nats::Client);
@@ -14,6 +14,11 @@ impl Connection {
 
     pub fn state(&self) -> State {
         self.0.connection_state()
+    }
+
+    /// Count successful connections, including reconnects, for connection-local observations.
+    pub fn successful_connections(&self) -> u64 {
+        self.0.statistics().connects.load(Ordering::Relaxed)
     }
 
     pub async fn drain(self) -> Result<(), Error> {
@@ -58,6 +63,25 @@ impl Connection {
         envelope: &Envelope<T>,
         timeout: Duration,
     ) -> Result<Message, Error> {
+        self.request_inner(envelope, timeout, false).await
+    }
+
+    /// Use a dedicated reply subscription that is dropped on timeout or cancellation.
+    /// Suitable for periodic probes that must not retain unanswered requests in the multiplexer.
+    pub async fn request_with_temporary_inbox<T: Contract>(
+        &self,
+        envelope: &Envelope<T>,
+        timeout: Duration,
+    ) -> Result<Message, Error> {
+        self.request_inner(envelope, timeout, true).await
+    }
+
+    async fn request_inner<T: Contract>(
+        &self,
+        envelope: &Envelope<T>,
+        timeout: Duration,
+        temporary_inbox: bool,
+    ) -> Result<Message, Error> {
         if T::DELIVERY != Delivery::Core || T::ROUTE.kind != Kind::Query {
             return Err(Error::WrongTransport);
         }
@@ -66,6 +90,11 @@ impl Connection {
             .headers(envelope.headers())
             .payload(payload.into())
             .timeout(Some(timeout));
+        let request = if temporary_inbox {
+            request.inbox(self.0.new_inbox())
+        } else {
+            request
+        };
         Ok(self.0.send_request(envelope.subject()?, request).await?)
     }
 

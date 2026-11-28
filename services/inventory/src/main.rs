@@ -1,4 +1,4 @@
-//! Trusted, one-shot fixture adapter for the first Inventory use case.
+//! Inventory runtime plus the preserved trusted, one-shot stock fixture adapter.
 use mongodb::{
     Client, ClientSession, Collection, Database,
     bson::{DateTime, Document, doc},
@@ -13,6 +13,13 @@ use std::{
 use uuid::Uuid;
 
 mod cancellation;
+mod consumer;
+mod material_plan;
+mod netting;
+mod preview;
+mod query;
+#[cfg(test)]
+mod receipt;
 
 #[derive(Deserialize)]
 #[serde(tag = "contract", deny_unknown_fields, rename_all_fields = "camelCase")]
@@ -86,7 +93,7 @@ async fn allocate(
         .await?
     {
         if old.get_document("stock") != Ok(stock_key) || old.get_i32("requested") != Ok(requested) {
-            return Err(Error::custom("conflicting confirmed line"));
+            return Err(Error::custom(preview::Rule::ConflictingLine));
         }
         return Ok(Allocation {
             reserved: old.get_i32("reserved").map_err(Error::custom)?,
@@ -170,7 +177,20 @@ async fn run() -> Result<(), &'static str> {
 }
 #[tokio::main]
 async fn main() -> ExitCode {
-    match run().await {
+    let mode = env::args().nth(1);
+    if mode.is_some() {
+        tracing_subscriber::fmt().json().init();
+    }
+    let outcome = match mode.as_deref() {
+        None => run().await.map_err(io::Error::other),
+        Some("serve") => query::serve().await,
+        Some("seed-preview") => preview::seed().await,
+        Some("provision-consumer") => consumer::provision().await,
+        Some("consume") => consumer::consume().await,
+        Some("relay-plans") => material_plan::handoff::relay().await,
+        Some(_) => Err(io::Error::other("Unknown Inventory role")),
+    };
+    match outcome {
         Ok(()) => ExitCode::SUCCESS,
         Err(e) => {
             eprintln!("{e}");

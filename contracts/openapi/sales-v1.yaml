@@ -1,0 +1,191 @@
+openapi: 3.1.0
+info:
+  title: erp4us Sales orders
+  version: 1.0.0
+  description: Scoped order with one whole-piece, EUR-priced catalog line in this preview. Confirmation commits the commercial snapshot and a pending event, not an inventory reservation.
+security:
+  - AccessToken: []
+paths:
+  /v1/sales/orders:
+    parameters:
+      - $ref: '#/components/parameters/Tenant'
+      - $ref: '#/components/parameters/Organization'
+    post:
+      operationId: createSalesOrderDraft
+      description: Requires sales.order.draft.create and permission to resolve the customer and product in this organization. Order ID is client-generated for safe retries. Identical retries by the creator return the saved draft; reusing its ID for a different command or actor is a conflict. Price and customer details are read from their owning APIs.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateDraft' }
+      responses:
+        '201': { $ref: '#/components/responses/Draft' }
+        '200': { $ref: '#/components/responses/Draft' }
+        '400': { description: Invalid scope or command shape }
+        '401': { description: Missing or invalid bearer token }
+        '403': { description: Missing exact permission in this scope }
+        '409': { description: Conflicting order ID }
+        '413': { description: Command body exceeds the preview limit }
+        '415': { description: Unsupported command media type }
+        '422': { description: Unknown or ineligible customer/product revision or invalid quantity }
+        '503': { description: Storage or owning service unavailable }
+    get:
+      operationId: listSalesOrderDrafts
+      description: Requires sales.order.read. The exclusive cursor sorts by order ID and cannot change the authorized scope.
+      parameters:
+        - in: query
+          name: after
+          schema: { type: string, format: uuid }
+        - in: query
+          name: limit
+          schema: { type: integer, minimum: 1, maximum: 50, default: 25 }
+      responses:
+        '200':
+          description: Page of sales orders
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, next_after]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/Order' }
+                  next_after: { type: [string, 'null'], format: uuid }
+        '400': { description: Invalid scope or cursor }
+        '401': { description: Missing or invalid bearer token }
+        '403': { description: Missing exact permission in this scope }
+        '503': { description: Storage unavailable }
+  /v1/sales/orders/{id}:
+    get:
+      operationId: getSalesOrderDraft
+      description: Requires sales.order.read.
+      parameters:
+        - $ref: '#/components/parameters/Tenant'
+        - $ref: '#/components/parameters/Organization'
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200': { $ref: '#/components/responses/Order' }
+        '400': { description: Invalid scope or ID }
+        '401': { description: Missing or invalid bearer token }
+        '403': { description: Missing exact permission in this scope }
+        '404': { description: No matching order in this organization }
+        '503': { description: Storage unavailable }
+  /v1/sales/orders/{id}/confirmation:
+    post:
+      operationId: confirmSalesOrder
+      description: Requires sales.order.confirm. Atomically stores the confirmation and its pending JetStream event. Repeating the original command ID and expected revision as the same actor returns the original confirmation, without another event. It does not wait for broker acknowledgement or reserve stock.
+      parameters:
+        - $ref: '#/components/parameters/Tenant'
+        - $ref: '#/components/parameters/Organization'
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [command_id, expected_revision]
+              properties:
+                command_id: { type: string, format: uuid }
+                expected_revision: { type: integer, minimum: 1, maximum: 4294967295 }
+      responses:
+        '200': { $ref: '#/components/responses/Order' }
+        '400': { description: Invalid scope or command shape }
+        '401': { description: Missing or invalid bearer token }
+        '403': { description: Missing exact permission in this scope }
+        '404': { description: No matching order in this organization }
+        '409': { description: The expected revision is stale or a different command already confirmed the order }
+        '413': { description: Command body exceeds the preview limit }
+        '415': { description: Unsupported command media type }
+        '503': { description: Storage unavailable }
+components:
+  securitySchemes:
+    AccessToken: { type: http, scheme: bearer, bearerFormat: JWT }
+  parameters:
+    Tenant: { name: X-Erp4us-Tenant, in: header, required: true, schema: { type: string, format: uuid } }
+    Organization: { name: X-Erp4us-Organization, in: header, required: true, schema: { type: string, format: uuid } }
+  responses:
+    Draft:
+      description: Saved draft with captured references
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Draft' }
+    Order:
+      description: Saved order snapshot and current confirmation status
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Order' }
+  schemas:
+    CreateDraft:
+      type: object
+      additionalProperties: false
+      required: [id, customer_id, sku, product_revision, pieces]
+      properties:
+        id: { type: string, format: uuid }
+        customer_id: { type: string, format: uuid }
+        sku: { type: string, pattern: '^[A-Z0-9-]{1,64}$' }
+        product_revision: { type: string, pattern: '^[A-Za-z0-9._-]{1,32}$' }
+        pieces: { $ref: '#/components/schemas/Pieces' }
+    Pieces: { type: string, pattern: '^(?:[1-9][0-9]{0,2}|1000)$' }
+    Money: { type: string, pattern: '^(?:0|[1-9][0-9]{0,9})\.[0-9]{2}$' }
+    Draft:
+      allOf:
+        - $ref: '#/components/schemas/Snapshot'
+        - properties:
+            status: { const: draft }
+            revision: { const: 1 }
+    Order:
+      allOf:
+        - $ref: '#/components/schemas/Snapshot'
+        - oneOf:
+            - properties:
+                status: { const: draft }
+                revision: { const: 1 }
+              not:
+                anyOf:
+                  - required: [confirmed_at]
+                  - required: [confirmation_event_id]
+            - required: [confirmed_at, confirmation_event_id]
+              properties:
+                status: { const: confirmed }
+                revision: { const: 2 }
+                confirmed_at: { type: string, format: date-time }
+                confirmation_event_id: { type: string, format: uuid }
+    Snapshot:
+      type: object
+      required: [id, status, revision, created_at, customer, line, currency, total]
+      properties:
+        id: { type: string, format: uuid }
+        status: { enum: [draft, confirmed] }
+        revision: { type: integer, minimum: 1 }
+        created_at: { type: string, format: date-time }
+        customer:
+          type: object
+          required: [id, revision, code, name, profile]
+          properties:
+            id: { type: string, format: uuid }
+            revision: { type: integer, minimum: 1 }
+            code: { type: string }
+            name: { type: string }
+            profile: { $ref: '../schemas/partner-profile-v1.json' }
+        line:
+          type: object
+          required: [id, sku, product_revision, name, unit, pieces, unit_price]
+          properties:
+            id: { type: string, format: uuid }
+            sku: { type: string }
+            product_revision: { type: string }
+            name: { type: string }
+            unit: { const: EA }
+            pieces: { $ref: '#/components/schemas/Pieces' }
+            unit_price: { $ref: '#/components/schemas/Money' }
+        currency: { const: EUR }
+        total: { $ref: '#/components/schemas/Money' }

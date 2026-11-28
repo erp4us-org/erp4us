@@ -1,0 +1,39 @@
+{
+  "subject": "v1.business.ddcae139-c1e8-47d2-8b48-349cb6f30ce5.inventory.event.purchase-receipt.posted.v1",
+  "headers": {
+    "Content-Type": "application/json",
+    "Erp4us-Protocol-Version": "1.0.0",
+    "Erp4us-Schema-Version": "1.0.0",
+    "Erp4us-Service-Version": "0.1.0",
+    "Erp4us-Message-Id": "2802893c-40cf-4bca-9340-a4b89ce3ef85",
+    "Erp4us-Correlation-Id": "2802893c-40cf-4bca-9340-a4b89ce3ef85",
+    "Erp4us-Source": "erp4us.inventory",
+    "Erp4us-Tenant-Id": "ddcae139-c1e8-47d2-8b48-349cb6f30ce5",
+    "Erp4us-Organization-Id": "3e793fb5-75a7-45f6-8f66-45a58fcec674",
+    "Nats-Msg-Id": "2802893c-40cf-4bca-9340-a4b89ce3ef85"
+  },
+  "envelope": {
+    "messageType": "v1.business.ddcae139-c1e8-47d2-8b48-349cb6f30ce5.inventory.event.purchase-receipt.posted.v1",
+    "messageId": "2802893c-40cf-4bca-9340-a4b89ce3ef85",
+    "correlationId": "2802893c-40cf-4bca-9340-a4b89ce3ef85",
+    "protocolVersion": "1.0.0",
+    "schemaVersion": "1.0.0",
+    "serviceVersion": "0.1.0",
+    "timestamp": "2026-11-28T09:00:00Z",
+    "sourceService": "erp4us.inventory",
+    "tenantId": "ddcae139-c1e8-47d2-8b48-349cb6f30ce5",
+    "organizationId": "3e793fb5-75a7-45f6-8f66-45a58fcec674",
+    "actor": {"id": "037fb451-4536-43b1-b992-3fde461efc76", "kind": "user"},
+    "payload": {
+      "receiptId": "a92dde16-7366-42b1-b5c1-69891edd8672",
+      "planId": "bcccc5c5-f640-4142-a722-f730f1fdc9b0",
+      "purchaseOrderId": "0d4930e8-f87c-407d-b3f3-54276db717a0",
+      "purchaseLineId": "bc4545ed-87ab-4a5a-ab7a-7be10195d523",
+      "sku": "NM-ENDPLATE",
+      "revision": null,
+      "unit": "EA",
+      "pieces": "6",
+      "receiptSequence": 1
+    }
+  }
+}

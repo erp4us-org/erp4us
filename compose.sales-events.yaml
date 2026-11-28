@@ -1,0 +1,18 @@
+services:
+  sales-relay:
+    image: ${COMPOSE_PROJECT_NAME:-erp4us}-sales
+    command: ["relay"]
+    restart: on-failure
+    environment:
+      SALES_MONGODB_URI: mongodb://sales_app:${DEV_SALES_MONGO_PASSWORD:?Generate a local Sales password}@mongo:27017/sales?replicaSet=erp4us&serverSelectionTimeoutMS=3000&w=majority
+      SALES_RELAY_TENANT: ddcae139-c1e8-47d2-8b48-349cb6f30ce5
+      NATS_URL: nats://nats:4222
+      NATS_PASSWORD: ${DEV_NATS_SALES_RELAY_PASSWORD:?Generate a local Sales relay password}
+    depends_on:
+      sales-db-init:
+        condition: service_completed_successfully
+      nats:
+        condition: service_healthy
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]

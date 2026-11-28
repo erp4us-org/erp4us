@@ -1,0 +1,109 @@
+openapi: 3.1.0
+info:
+  title: erp4us platform application diagnostics
+  version: 1.2.0
+security:
+  - AccessToken: []
+paths:
+  /v1/admin/application-health:
+    get:
+      operationId: observeApplicationHealth
+      description: Requires a platform.health.read grant. This endpoint accepts no target URL, host, subject, tenant selector or runtime commands.
+      responses:
+        '200':
+          description: HTTP and JetStream readiness probes, fixed-resource counters and an Article Relay heartbeat observation, not runtime container metadata.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [observed_at_unix_ms, application_checks, jetstream]
+                properties:
+                  observed_at_unix_ms: { type: integer, minimum: 0 }
+                  application_checks:
+                    type: array
+                    items:
+                      type: object
+                      required: [service, readiness]
+                      properties:
+                        service: { type: string }
+                        readiness: { enum: [ready, unready, unreachable] }
+                  jetstream:
+                    type: object
+                    required: [stream, consumer]
+                    properties:
+                      stream:
+                        description: ERP4US_BUSINESS_EVENTS_V1. Null when not observable.
+                        type: [object, 'null']
+                        required: [messages, bytes]
+                        properties:
+                          messages: { type: integer, minimum: 0 }
+                          bytes: { type: integer, minimum: 0 }
+                      consumer:
+                        description: article-receipts. Null when not observable.
+                        type: [object, 'null']
+                        required: [pending, ack_pending, redelivered]
+                        properties:
+                          pending: { type: integer, minimum: 0 }
+                          ack_pending: { type: integer, minimum: 0 }
+                          redelivered: { type: integer, minimum: 0 }
+                      pipeline_consumers:
+                        description: >
+                          Platform-wide observations of two fixed durable consumers on ERP4US_BUSINESS_EVENTS_V1.
+                          Each consumer is measured independently and is null when missing or not observable.
+                        type: object
+                        additionalProperties: false
+                        required: [inventory_sales, procurement_material_plans]
+                        properties:
+                          inventory_sales:
+                            description: inventory-sales-v1.
+                            $ref: '#/components/schemas/PipelineConsumerCounters'
+                          procurement_material_plans:
+                            description: procurement-material-plans-v1.
+                            $ref: '#/components/schemas/PipelineConsumerCounters'
+                  article_relay_heartbeat:
+                    $ref: '#/components/schemas/ArticleRelayHeartbeat'
+        '401': { description: No verified access token }
+        '403': { description: Missing platform grant }
+        '503': { description: 'Reporting service unavailable or concurrent probe limit reached' }
+components:
+  schemas:
+    PipelineConsumerCounters:
+      type: [object, 'null']
+      additionalProperties: false
+      required: [pending, ack_pending, redelivered]
+      properties:
+        pending: { type: integer, minimum: 0, description: Messages awaiting delivery. }
+        ack_pending: { type: integer, minimum: 0, description: Messages awaiting acknowledgement. }
+        redelivered: { type: integer, minimum: 0, description: Messages currently counted as redelivered by JetStream. }
+    ArticleRelayHeartbeat:
+      description: >
+        Ephemeral Core NATS presence for the most recently observed instance of the preview's single
+        Article Relay. This does not measure application readiness or Docker runtime status.
+      type: object
+      required: [state, interval_seconds, instance_id, age_seconds]
+      properties:
+        state:
+          type: string
+          enum: [waiting, fresh, stale, disabled, unavailable]
+          description: >
+            Waiting means no valid receipt in the current observation window, within the initial
+            grace of three configured intervals. Fresh means a valid receipt less than three
+            intervals old; stale means at least three intervals elapsed from receipt or the start
+            of the grace window. Disabled means the settings owner reported interval zero.
+            Unavailable means the broker subscription or current settings could not be observed.
+            A broker reconnect starts a new window and requires a new valid receipt for freshness.
+        interval_seconds:
+          type: [integer, 'null']
+          minimum: 0
+          maximum: 3600
+          description: Active interval from the relay settings owner. Null when unavailable.
+        instance_id:
+          type: [string, 'null']
+          format: uuid
+          description: Last valid instance observed in this window, when known and enabled.
+        age_seconds:
+          type: [integer, 'null']
+          minimum: 0
+          description: Whole seconds since local monotonic receipt, not calculated from the producer timestamp. Null without an instance.
+  securitySchemes:
+    AccessToken: { type: http, scheme: bearer, bearerFormat: JWT }

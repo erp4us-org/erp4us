@@ -2,12 +2,7 @@ use serde::{Deserialize, Serialize};
 use time::OffsetDateTime;
 use uuid::Uuid;
 
-#[derive(Clone, Copy)]
-pub(crate) struct Scope {
-    pub(crate) tenant: Uuid,
-    pub(crate) organization: Uuid,
-    pub(crate) actor: Uuid,
-}
+pub(crate) use erp4us_identity::Scope;
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]

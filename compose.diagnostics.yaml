@@ -1,0 +1,27 @@
+services:
+  diagnostics:
+    image: ${COMPOSE_PROJECT_NAME:-erp4us}-diagnostics
+    build:
+      context: .
+      dockerfile: services/diagnostics/Dockerfile
+    environment:
+      ERP4US_BIND: 0.0.0.0:8091
+      ERP4US_IDENTITY_POLICY: /etc/erp4us/identity-policy.json
+      ERP4US_ISSUER_JWKS: /etc/erp4us/issuer-jwks.json
+      NATS_URL: nats://nats:4222
+      # Fixed JetStream metadata reads and Article Relay heartbeat/interval observation only.
+      NATS_PASSWORD: ${DEV_NATS_DIAGNOSTICS_PASSWORD:?Generate a local diagnostics password}
+    volumes:
+      - type: bind
+        source: ${ERP4US_IDENTITY_DIR:-./.dev-auth}/identity-policy.json
+        target: /etc/erp4us/identity-policy.json
+        read_only: true
+      - type: bind
+        source: ${ERP4US_IDENTITY_DIR:-./.dev-auth}/issuer-jwks.json
+        target: /etc/erp4us/issuer-jwks.json
+        read_only: true
+    ports:
+      - "127.0.0.1:${ERP4US_DIAGNOSTICS_PORT:-8091}:8091"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]

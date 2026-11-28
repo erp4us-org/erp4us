@@ -1,5 +1,4 @@
 use crate::{
-    auth::{Auth, Denial, Permission},
     domain::{Article, RegisterArticle, Scope},
     partners,
     store::{InsertError, Store},
@@ -12,6 +11,7 @@ use axum::{
     response::{IntoResponse, Response},
     routing::{get, post},
 };
+use erp4us_identity::{Auth, Denial};
 use serde::Serialize;
 use time::OffsetDateTime;
 use uuid::Uuid;
@@ -21,44 +21,69 @@ pub(crate) fn router(store: Store, auth: Auth) -> Router {
         .route(
             "/v1/articles:register",
             post(register).layer(middleware::from_fn_with_state(
-                (auth.clone(), Permission::Register),
+                (auth.clone(), "master-data.article.register"),
                 authorize,
             )),
         )
         .route(
             "/v1/articles/{id}",
             get(find).layer(middleware::from_fn_with_state(
-                (auth.clone(), Permission::Read),
+                (auth.clone(), "master-data.article.read"),
                 authorize,
             )),
         )
         .route(
             "/v1/units:register",
             post(crate::units::register).layer(middleware::from_fn_with_state(
-                (auth.clone(), Permission::RegisterUnit),
+                (auth.clone(), "master-data.unit.register"),
                 authorize,
             )),
         )
         .route(
             "/v1/units/{id}",
             get(crate::units::find).layer(middleware::from_fn_with_state(
-                (auth.clone(), Permission::ReadUnit),
+                (auth.clone(), "master-data.unit.read"),
+                authorize,
+            )),
+        )
+        .route(
+            "/v1/partners",
+            get(partners::list).layer(middleware::from_fn_with_state(
+                (auth.clone(), "master-data.partner.read"),
                 authorize,
             )),
         )
         .route(
             "/v1/partners:register",
             post(partners::register).layer(middleware::from_fn_with_state(
-                (auth.clone(), Permission::RegisterPartner),
+                (auth.clone(), "master-data.partner.register"),
                 authorize,
             )),
         )
         .route(
             "/v1/partners/{id}",
             get(partners::find).layer(middleware::from_fn_with_state(
-                (auth, Permission::ReadPartner),
+                (auth.clone(), "master-data.partner.read"),
                 authorize,
             )),
+        )
+        .route(
+            "/v1/session",
+            get(move |headers: axum::http::HeaderMap| async move {
+                let mut response = match auth.authenticate(&headers) {
+                    Ok(principal) => Json(principal).into_response(),
+                    Err(Denial::Unauthenticated) => (
+                        [(header::WWW_AUTHENTICATE, HeaderValue::from_static("Bearer"))],
+                        StatusCode::UNAUTHORIZED,
+                    )
+                        .into_response(),
+                    Err(_) => StatusCode::FORBIDDEN.into_response(),
+                };
+                response
+                    .headers_mut()
+                    .insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
+                response
+            }),
         )
         .layer(DefaultBodyLimit::max(4096))
         .route("/health/live", get(|| async { StatusCode::NO_CONTENT }))
@@ -67,7 +92,7 @@ pub(crate) fn router(store: Store, auth: Auth) -> Router {
 }
 
 async fn authorize(
-    State((auth, permission)): State<(Auth, Permission)>,
+    State((auth, permission)): State<(Auth, &'static str)>,
     mut request: Request,
     next: Next,
 ) -> Response {

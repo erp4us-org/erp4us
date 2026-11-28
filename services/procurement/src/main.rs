@@ -1,5 +1,20 @@
-//! Local, operator-only fixture inputs. No network ingress or supplier actions.
+//! Procurement draft runtime and the trusted local stdin fixture adapter.
+mod approval_store;
+mod budget_approvals;
+mod budget_policy;
+mod consumer;
+mod drafts;
+mod material_plan;
+mod partners;
+mod purchase_batch;
+mod purchase_store;
+mod query;
+mod receipt_projection;
+#[cfg(test)]
+mod receipt_wire;
 mod store;
+mod terms;
+mod terms_store;
 
 use mongodb::Client;
 use serde::{Deserialize, Serialize};
@@ -63,6 +78,7 @@ struct Proposal {
     source: Shortage,
 }
 
+#[derive(Clone, Copy)]
 struct Scope {
     tenant_id: Uuid,
     organization_id: Uuid,
@@ -141,11 +157,29 @@ async fn run() -> Result<(), &'static str> {
 
 #[tokio::main]
 async fn main() -> ExitCode {
-    match run().await {
+    let mode = env::args().nth(1);
+    if mode.is_some() {
+        tracing_subscriber::fmt().json().init();
+    }
+    let outcome = match mode.as_deref() {
+        None => run().await.map_err(io::Error::other),
+        Some("serve") => query::serve().await,
+        Some("provision-consumer") => consumer::provision().await,
+        Some("consume") => consumer::consume().await,
+        Some(_) => Err(io::Error::other("Unknown Procurement role")),
+    };
+    match outcome {
         Ok(()) => ExitCode::SUCCESS,
         Err(message) => {
             eprintln!("{message}");
             ExitCode::FAILURE
         }
     }
+}
+
+fn required(key: &str) -> io::Result<String> {
+    env::var(key)
+        .ok()
+        .filter(|value| !value.trim().is_empty())
+        .ok_or_else(|| io::Error::other(format!("Missing {key}")))
 }

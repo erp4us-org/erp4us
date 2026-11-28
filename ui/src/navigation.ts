@@ -6,7 +6,10 @@ export interface Access {
   readonly enabled: ReadonlySet<string>;
   readonly permissions: ReadonlySet<string>;
 }
-interface Restricted { readonly permissions?: readonly string[] }
+interface Restricted {
+  readonly permissions?: readonly string[];
+  readonly anyPermission?: readonly string[];
+}
 interface Entry extends Restricted {
   readonly id: string;
   readonly label: Message;
@@ -35,7 +38,8 @@ export interface ShellRegistration {
 export const SHELL_REGISTRATION = new InjectionToken<ShellRegistration>('shell registration');
 
 export function permits(access: Access, item: Restricted): boolean {
-  return item.permissions?.every(grant => access.permissions.has(grant)) ?? true;
+  return (item.permissions?.every(grant => access.permissions.has(grant)) ?? true)
+    && (item.anyPermission?.some(grant => access.permissions.has(grant)) ?? true);
 }
 
 function visibleEntries(entries: readonly Entry[], access: Access): Entry[] {

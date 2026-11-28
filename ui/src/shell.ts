@@ -6,6 +6,7 @@ import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } fro
 import { LucideBuilding2, LucideCircleHelp, LucidePanelLeft, LucideX } from '@lucide/angular';
 import { SHELL_REGISTRATION, permits, visibleModules } from './navigation';
 import { Preferences } from './preferences';
+import { ArticleApi } from './article-api';
 
 @Component({
   selector: 'app-root',
@@ -18,7 +19,14 @@ export class Shell {
   readonly prefs = inject(Preferences);
   readonly loopback = this.registration.localSetup;
   readonly t = this.prefs.t;
-  readonly visible = visibleModules(this.registration.modules, this.registration.access);
+  readonly api = inject(ArticleApi);
+  readonly visible = computed(() => visibleModules(this.registration.modules, {
+    ...this.registration.access,
+    permissions: new Set([
+      ...(this.api.grant()?.permissions ?? []).filter(permission => !permission.startsWith('platform.')),
+      ...this.api.diagnosticsPermissions(),
+    ]),
+  }));
   readonly routeData = signal<Record<string, unknown>>({});
   readonly mobileNav = signal(false);
   readonly main = viewChild.required<ElementRef<HTMLElement>>('main');
@@ -26,7 +34,7 @@ export class Shell {
   readonly panelTitle = viewChild<ElementRef<HTMLElement>>('panelTitle');
   readonly secondaryNav = viewChild<ElementRef<HTMLElement>>('secondaryNav');
   readonly mobileToggle = viewChild<ElementRef<HTMLButtonElement>>('mobileToggle');
-  readonly current = computed(() => this.visible.find(module => module.id === this.routeData()['module']));
+  readonly current = computed(() => this.visible().find(module => module.id === this.routeData()['module']));
   readonly contextPanel = computed(() => this.registration.panels.find(panel =>
     panel.id === this.routeData()['panel'] && permits(this.registration.access, panel)));
   readonly panelOpen = computed(() => Boolean(this.contextPanel()) && this.prefs.panel() === 'open');

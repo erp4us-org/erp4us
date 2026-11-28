@@ -1,0 +1,27 @@
+{
+  "messageType": "v1.business.ddcae139-c1e8-47d2-8b48-349cb6f30ce5.inventory.event.material-plan.netted.v1",
+  "messageId": "e44a77a1-9a2c-4c09-97a1-d509ad7b602c",
+  "correlationId": "ae27188c-c804-4b3c-a85a-678d1f570dba",
+  "causationId": "ae27188c-c804-4b3c-a85a-678d1f570dba",
+  "protocolVersion": "1.0.0",
+  "schemaVersion": "1.0.0",
+  "serviceVersion": "0.1.0",
+  "timestamp": "2026-11-28T08:00:00Z",
+  "sourceService": "erp4us.inventory",
+  "tenantId": "ddcae139-c1e8-47d2-8b48-349cb6f30ce5",
+  "organizationId": "3e793fb5-75a7-45f6-8f66-45a58fcec674",
+  "actor": {"id": "142a290f-4bbc-438e-aefe-e3697a8bcd16", "kind": "user"},
+  "payload": {
+    "planId": "bcccc5c5-f640-4142-a722-f730f1fdc9b0",
+    "orderId": "acf27f04-dfdf-445b-b38d-55514cc9c433",
+    "lineId": "5b83b773-f8b2-42e0-b995-64d565c0ae2d",
+    "bom": {"sku": "NM-1000", "revision": "A"},
+    "buyRows": [
+      {"sku": "NM-ENDPLATE", "revision": null, "unit": "EA", "pieces": "12"},
+      {"sku": "NM-MOTOR", "revision": null, "unit": "EA", "pieces": "6"},
+      {"sku": "NM-RAIL", "revision": null, "unit": "EA", "pieces": "8"},
+      {"sku": "NM-SENSOR", "revision": null, "unit": "EA", "pieces": "10"},
+      {"sku": "NM-SPINDLE", "revision": null, "unit": "EA", "pieces": "10"}
+    ]
+  }
+}

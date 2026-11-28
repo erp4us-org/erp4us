@@ -2,6 +2,24 @@
 
 This is a priority order, not a release schedule. Run the smallest useful slice continuously and keep new services independently deployable.
 
+## Current integration: a complete manufacturing preview
+
+The [First Working ERP milestone](https://github.com/erp4us-org/erp4us/milestone/5) uses [tracker #119](https://github.com/erp4us-org/erp4us/issues/119) and one [draft integration PR #120](https://github.com/erp4us-org/erp4us/pull/120). The following milestones describe draft-branch evidence and future exit criteria, not released capabilities.
+
+| Step | Evidence or next gate |
+|---|---|
+| Sign-in, catalog and order | The draft branch runs real local Keycloak sign-in with verified tenant scope, persisted partners and pinned BOMs. An Atlas order for 10 `NM-1000` at EUR 2,490 confirms durably; Inventory reserves eligible finished stock after JetStream delivery without allocating again on replay. |
+| Net material planning | The [tested checkpoint](https://github.com/erp4us-org/erp4us/commit/eaf5ee9) commits one pinned plan and actual component reservations. It recommends making ten of each subassembly and the final module and identifies five exact purchase shortages. |
+| Procurement draft | The draft branch creates one Procurement-owned proposal from an authorized handoff of the five shortages. Local Compose and browser tests verify the handoff survives broker outage and replay without changing the proposal. The buyer can record scoped suppliers and exact EUR unit prices without approving or ordering anything. |
+| Staged purchasing approval | An explicit [synthetic policy](docs/rfc/preview-budget-approvals.md) requires two decisions for the EUR 1,882.40 draft. Local tests prove distinct actors, stable retry and revision changes without reusing old approval. An approved draft is not a purchase order. |
+| Purchase order and partial receipts | The draft branch adds [explicit local issuance](docs/rfc/preview-purchase-issuance.md) for [#23](https://github.com/erp4us-org/erp4us/issues/23): one immutable batch per plan after complete approval, with no supplier transmission. Next: receive the end plates in two lots of six under a separate grant, account for the open quantity and allocate each receipt to the waiting plan exactly once. |
+| Production and fulfillment | [Execution proposal](docs/rfc/novamotion-execution-preview.md): consume held inputs, record actual quantities bottom-up, reserve the completed modules for Sales and ship ten. Keep partial shipment terms separate from partial receipts. Persist the [private shipment PDF](docs/rfc/preview-document-release.md) and [linked process history](docs/rfc/novamotion-process-history.md). Verify zero outstanding finished demand and holds, no duplicate movements and no negative stock. |
+| Operational acceptance | The draft branch shows application readiness, Article Relay heartbeat age and live JetStream counters for Article, Inventory and Procurement consumers. Local tests distinguish a missing consumer from measured zero and show the Procurement backlog draining after a worker restart. Read-only [runtime inventory and redacted logs](docs/rfc/preview-runtime-diagnostics.md) are the next diagnostic gate, not container control ([#122](https://github.com/erp4us-org/erp4us/issues/122)). Prove the full flow in a clean browser session, tenant isolation and interrupted-service recovery. Qualify the preview identity image ([#121](https://github.com/erp4us-org/erp4us/issues/121)) before final acceptance. |
+
+See the [preview runbook](docs/development/first-working-erp.md) for the exact scope and remaining checks.
+
+## Platform priorities
+
 | Priority | Deliverable | Exit evidence |
 |---|---|---|
 | Now | Foundation and Master Data article register/get | Compose smoke reaches MongoDB; duplicate SKU is rejected; service restart preserves the article. Draft contract checks, governance and initial threat model are present. |

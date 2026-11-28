@@ -27,6 +27,11 @@ pub(super) async fn cancel(db: &Database, key: Document) -> mongodb::error::Resu
             if row.contains_key("cancellation") {
                 return Ok(Release { released: 0 });
             }
+            if row.contains_key("materialPlanId") {
+                return Err(Error::custom(
+                    "release the material plan before cancelling this line",
+                ));
+            }
             let released = row.get_i32("reserved").map_err(Error::custom)?;
             let withdrawn = row.get_i32("outstanding").map_err(Error::custom)?;
             if released > 0 {

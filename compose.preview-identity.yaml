@@ -1,0 +1,22 @@
+services:
+  preview-identity:
+    image: quay.io/keycloak/keycloak:26.8.2@sha256:7e66a96e4739239070aeaf72e4c5decf0f7f682cfc725b9f7ea2b336eaba38b3
+    command:
+      - start-dev
+      - --import-realm
+      - --hostname=https://127.0.0.1:9443
+      - --http-enabled=false
+      - --https-certificate-file=/opt/keycloak/preview/localhost.crt
+      - --https-certificate-key-file=/opt/keycloak/preview/localhost.key
+    environment:
+      KC_HEALTH_ENABLED: 'true'
+    volumes:
+      - preview-identity-data:/opt/keycloak/data
+      - ./.erp4us-preview/provider:/opt/keycloak/preview:ro
+      - ./.erp4us-preview/realm:/opt/keycloak/data/import:ro
+    ports:
+      - "127.0.0.1:9443:8443"
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+volumes:
+  preview-identity-data:

@@ -1,0 +1,40 @@
+services:
+  sales-db-init:
+    image: mongo:8.0.38@sha256:479e85ced54ffb8a40dade1dcde2da2a9ae858515b9415e9cc54bfb8f0575d01
+    entrypoint: ["/bin/sh", "/opt/erp4us/init-sales-db.sh"]
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: dev_mongo_admin
+      MONGO_INITDB_ROOT_PASSWORD: ${DEV_MONGO_ROOT_PASSWORD:?Run sh scripts/init-dev.sh first}
+      DEV_SALES_MONGO_PASSWORD: ${DEV_SALES_MONGO_PASSWORD:?Generate a local Sales password}
+    volumes:
+      - ./infrastructure/compose/init-sales-db.sh:/opt/erp4us/init-sales-db.sh:ro
+    depends_on:
+      mongo:
+        condition: service_healthy
+  sales:
+    image: ${COMPOSE_PROJECT_NAME:-erp4us}-sales
+    build:
+      context: .
+      dockerfile: services/sales/Dockerfile
+    environment:
+      ERP4US_BIND: 0.0.0.0:8092
+      ERP4US_IDENTITY_POLICY: /etc/erp4us/identity-policy.json
+      ERP4US_ISSUER_JWKS: /etc/erp4us/issuer-jwks.json
+      SALES_MONGODB_URI: mongodb://sales_app:${DEV_SALES_MONGO_PASSWORD:?Generate a local Sales password}@mongo:27017/sales?replicaSet=erp4us&serverSelectionTimeoutMS=3000&w=majority
+    volumes:
+      - type: bind
+        source: ${ERP4US_IDENTITY_DIR:-./.dev-auth}/identity-policy.json
+        target: /etc/erp4us/identity-policy.json
+        read_only: true
+      - type: bind
+        source: ${ERP4US_IDENTITY_DIR:-./.dev-auth}/issuer-jwks.json
+        target: /etc/erp4us/issuer-jwks.json
+        read_only: true
+    depends_on:
+      sales-db-init:
+        condition: service_completed_successfully
+    ports:
+      - "127.0.0.1:${ERP4US_SALES_PORT:-8092}:8092"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]

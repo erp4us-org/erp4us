@@ -4,7 +4,17 @@
     <img src="/brand/symbol.svg" alt="" width="34" height="34">
     <span>erp<b>4</b>us</span>
   </a>
-  <span class="organization"><svg lucideBuilding2 aria-hidden="true"></svg>{{ t()('scope') }}</span>
+  <span class="organization"><svg lucideBuilding2 aria-hidden="true"></svg>
+    @if (api.grants().length) {
+      <label class="sr-only" for="organization-scope">{{ t()('selectScope') }}</label>
+      <select id="organization-scope" #scope [value]="api.selectedIndex()" (change)="api.selectGrant(+scope.value)">
+        @for (grant of api.grants(); track $index) {
+          <option [value]="$index">{{ api.scopeLabel(grant) }}</option>
+        }
+      </select>
+    } @else if (api.diagnosticsPermissions().length) { {{ t()('platformContext') }} }
+    @else { {{ t()('scope') }} }
+  </span>
   <div class="top-actions">
     <label class="sr-only" for="language">{{ t()('language') }}</label>
     <select id="language" #language [value]="prefs.locale()"
@@ -28,7 +38,7 @@
 
 <div class="shell-body" [class.secondary-closed]="prefs.secondary() === 'closed'" [class.mobile-open]="mobileNav()">
   <nav class="rail" [attr.aria-label]="t()('modules')">
-    @for (module of visible; track module.id) {
+    @for (module of visible(); track module.id) {
       <a class="module-link" [routerLink]="module.route" [class.selected]="current()?.id === module.id"
          [attr.aria-current]="current()?.id === module.id ? 'true' : null">
         <span aria-hidden="true"><ng-container *ngComponentOutlet="module.icon" /></span>

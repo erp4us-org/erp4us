@@ -1,0 +1,356 @@
+openapi: 3.1.0
+info:
+  title: erp4us Inventory reservations
+  version: 1.0.0
+  description: Read the Inventory-owned outcome of a confirmed Sales line. An outstanding quantity is not a purchase commitment or authorization to ship.
+security:
+  - AccessToken: []
+paths:
+  /v1/inventory/reservations/{order_id}/{line_id}:
+    get:
+      operationId: getOrderLineReservation
+      description: Requires inventory.reservation.read in the verified organization. A line can take time to appear after Sales confirmation.
+      parameters:
+        - in: header
+          name: X-Erp4us-Tenant
+          required: true
+          schema: { type: string, format: uuid }
+        - in: header
+          name: X-Erp4us-Organization
+          required: true
+          schema: { type: string, format: uuid }
+        - in: path
+          name: order_id
+          required: true
+          schema: { type: string, format: uuid }
+        - in: path
+          name: line_id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Persisted reservation or outstanding demand in the authorized scope
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Reservation' }
+        '400': { description: Invalid scope or line reference }
+        '401': { description: Missing or invalid bearer token }
+        '403': { description: Missing reservation read grant }
+        '404': { description: No reservation for this line in the authorized scope }
+        '503': { description: Inventory storage unavailable }
+  /v1/inventory/reservations/{order_id}/{line_id}/material-plan:
+    parameters:
+      - in: header
+        name: X-Erp4us-Tenant
+        required: true
+        schema: { type: string, format: uuid }
+      - in: header
+        name: X-Erp4us-Organization
+        required: true
+        schema: { type: string, format: uuid }
+      - in: path
+        name: order_id
+        required: true
+        schema: { type: string, format: uuid }
+      - in: path
+        name: line_id
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      operationId: getMaterialPlan
+      description: Requires inventory.material-plan.read in the verified organization.
+      responses:
+        '200': { $ref: '#/components/responses/MaterialPlan' }
+        '400': { description: Invalid scope or line reference }
+        '401': { description: Missing or invalid bearer token }
+        '403': { description: Missing material-plan read grant }
+        '404': { description: No material plan for this line in the authorized scope }
+        '503': { description: Inventory storage unavailable }
+    post:
+      operationId: createMaterialPlan
+      description: >
+        Requires inventory.material-plan.create and manufacturing.plan.read.
+        No request body: Inventory uses its recorded outstanding demand, warehouse, and pinned product revision.
+        Resolves the structure through Manufacturing, reserves available components and stores one immutable plan
+        per line in one Inventory transaction. Identical requests return that plan without allocating again.
+        Production and purchase quantities are recommendations, not orders or purchase approval.
+      responses:
+        '201': { $ref: '#/components/responses/MaterialPlan' }
+        '200': { $ref: '#/components/responses/MaterialPlan' }
+        '400': { description: Invalid scope or line reference }
+        '401': { description: Missing or invalid bearer token }
+        '403': { description: Missing required scope grant }
+        '404': { description: No corresponding reservation in the authorized scope }
+        '409': { description: 'No demand remains to plan, the reservation changed, or the pinned structure is unavailable for planning' }
+        '413': { description: No request body is accepted and its size exceeded the bounded request limit }
+        '503': { description: 'Inventory or Manufacturing unavailable, or configured component stock could not be verified' }
+  /v1/inventory/reservations/{order_id}/{line_id}/material-plan/procurement-handoff:
+    parameters:
+      - in: header
+        name: X-Erp4us-Tenant
+        required: true
+        schema: { type: string, format: uuid }
+      - in: header
+        name: X-Erp4us-Organization
+        required: true
+        schema: { type: string, format: uuid }
+      - in: path
+        name: order_id
+        required: true
+        schema: { type: string, format: uuid }
+      - in: path
+        name: line_id
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      operationId: getProcurementHandoff
+      description: Requires inventory.material-plan.read. Published means acknowledged by JetStream, not processed or approved in Procurement.
+      responses:
+        '200': { $ref: '#/components/responses/ProcurementHandoff' }
+        '400': { description: Invalid scope or line reference }
+        '401': { description: Missing or invalid bearer token }
+        '403': { description: Missing material-plan read grant }
+        '404': { description: No handoff for this line in the authorized scope }
+        '503': { description: Inventory storage unavailable }
+    post:
+      operationId: sendMaterialShortages
+      description: >
+        Requires inventory.material-plan.send. No request body is accepted. Inventory writes one pending event for
+        positive uncovered material quantities in its immutable plan. A retry returns the original handoff.
+        This does not commit spend or wait for Procurement.
+      responses:
+        '201': { $ref: '#/components/responses/ProcurementHandoff' }
+        '200': { $ref: '#/components/responses/ProcurementHandoff' }
+        '400': { description: Invalid scope or line reference or unexpected request body }
+        '401': { description: Missing or invalid bearer token }
+        '403': { description: Missing handoff permission }
+        '404': { description: No material plan for this line in the authorized scope }
+        '409': { description: No positive buy rows or the event would exceed its preview bounds }
+        '413': { description: Request body exceeds the bounded request limit }
+        '503': { description: Inventory storage unavailable or the source correlation could not be resolved }
+  /v1/inventory/reservations/{order_id}/{line_id}/material-plan/purchase-orders/{purchase_order_id}/lines/{purchase_line_id}/receipts:
+    parameters:
+      - in: header
+        name: X-Erp4us-Tenant
+        required: true
+        description: Selects tenant; does not grant access.
+        schema: { $ref: '#/components/schemas/CanonicalId' }
+      - in: header
+        name: X-Erp4us-Organization
+        required: true
+        description: Selects organization; does not grant access.
+        schema: { $ref: '#/components/schemas/CanonicalId' }
+      - in: path
+        name: order_id
+        required: true
+        description: The Sales order of the Inventory-owned plan.
+        schema: { $ref: '#/components/schemas/CanonicalId' }
+      - in: path
+        name: line_id
+        required: true
+        description: The Sales line of the Inventory-owned plan.
+        schema: { $ref: '#/components/schemas/CanonicalId' }
+      - in: path
+        name: purchase_order_id
+        required: true
+        schema: { $ref: '#/components/schemas/CanonicalId' }
+      - in: path
+        name: purchase_line_id
+        required: true
+        schema: { $ref: '#/components/schemas/CanonicalId' }
+    post:
+      operationId: postPreviewPurchaseReceipt
+      x-contract-status: proposed
+      description: >
+        Proposed local preview, not implemented. Requires inventory.purchase-receipt.post in the
+        verified tenant and organization. For a new receipt Inventory locates its plan by the exact
+        scoped Sales order and line, then calls Procurement's receipt-source GET with its stored plan
+        ID under the receiver's verified identity and matches exactly one tuple by both purchase IDs.
+        Procurement requires its scoped procurement.purchase-order.receipt-source.read grant
+        and enforces receiver separation.
+        Only the receipt ID and exact positive whole EA quantity are accepted. Inventory resolves
+        the destination solely from its recorded plan and verified component stock mapping; no
+        client or Procurement warehouse, source snapshot, item override or fallback.
+        Movement, allocation to the eligible waiting row, line balance, command result and receipt
+        fact/outbox commit in one Inventory transaction. No supplier transmission.
+        After current Inventory authorization, the original actor replaying the identical scoped
+        command gets the original committed result without contacting Procurement, even after the
+        plan changes. A receipt ID is unique across the tenant and organization; intent binds the
+        Sales order/line, purchase order/line and exact quantity. On an uncertain outcome retry
+        with the same ID. Response JSON bodies are bounded to 16 KiB.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PostPurchaseReceipt' }
+      responses:
+        '201': { $ref: '#/components/responses/PostedPurchaseReceipt' }
+        '200': { $ref: '#/components/responses/PostedPurchaseReceipt' }
+        '400': { description: 'Invalid scope, identifiers, malformed command or noncanonical quantity' }
+        '401': { description: Missing or invalid Inventory bearer token }
+        '403': { description: 'Required scoped grant missing, receiver fails separation, or receipt ID is bound to another actor' }
+        '404': { description: No matching plan or issued purchase order/line for the plan in the authorized scope }
+        '409':
+          description: Changed intent under the same receipt ID, line over-receipt, or ineligible waiting plan/row or state transition.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [code]
+                properties:
+                  code: { enum: [receipt_intent_changed, over_receipt, plan_ineligible] }
+        '413': { description: Request body exceeds the bounded request limit }
+        '503': { description: 'Source/stock binding cannot be verified, storage is unavailable, or commit outcome is uncertain' }
+    get:
+      operationId: getPreviewPurchaseReceiptAllocation
+      x-contract-status: proposed
+      description: >
+        Proposed local preview, not implemented. Requires inventory.purchase-receipt.read in the
+        verified tenant and organization. Reads the current Inventory allocation and outstanding
+        shortage for the specified purchase line and its linked plan row in one local snapshot,
+        independently of Procurement. This does not alter the original material-plan snapshot or
+        material-plan.netted event. The view exists once a receipt binds the specified line;
+        before then absence is not an assertion about order existence, available stock or balance.
+        Response JSON bodies are bounded to 16 KiB.
+      responses:
+        '200':
+          description: Inventory-owned receipt allocation and current plan-row quantities at the local read snapshot
+          headers:
+            Cache-Control: { $ref: '#/components/headers/ReceiptNoStore' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PurchaseReceiptAllocation' }
+        '400': { description: Invalid scope or identifiers }
+        '401': { description: Missing or invalid bearer token }
+        '403': { description: Missing scoped purchase receipt read grant }
+        '404': { description: No matching recorded purchase receipt allocation in the authorized scope }
+        '503': { description: Inventory allocation state cannot be safely read }
+components:
+  securitySchemes:
+    AccessToken: { type: http, scheme: bearer, bearerFormat: JWT }
+  headers:
+    ReceiptNoStore:
+      required: true
+      schema: { type: string, const: no-store }
+  responses:
+    PostedPurchaseReceipt:
+      description: >
+        Committed receipt (201 on first post, 200 on authorized identical replay).
+        Quantities after the receipt are the original commit snapshot, not refreshed on replay.
+      headers:
+        Cache-Control: { $ref: '#/components/headers/ReceiptNoStore' }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/PostedPurchaseReceipt' }
+    MaterialPlan:
+      description: Stored plan and allocated quantities
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/MaterialPlan' }
+    ProcurementHandoff:
+      description: Inventory outbox state
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [plan_id, event_id, state]
+            properties:
+              plan_id: { type: string, format: uuid }
+              event_id: { type: string, format: uuid }
+              state: { enum: [pending, published] }
+  schemas:
+    CanonicalId:
+      type: string
+      format: uuid
+      pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(?![\s\S])'
+      not: { const: '00000000-0000-0000-0000-000000000000' }
+    ReceiptPieces: { type: string, pattern: '^(?:[1-9][0-9]{0,5}|1000000)(?![\s\S])' }
+    PostPurchaseReceipt:
+      type: object
+      additionalProperties: false
+      required: [receipt_id, pieces]
+      properties:
+        receipt_id: { $ref: '#/components/schemas/CanonicalId' }
+        pieces: { $ref: '#/components/schemas/ReceiptPieces' }
+    PostedPurchaseReceipt:
+      type: object
+      additionalProperties: false
+      required: [receipt_id, pieces, posted_at, allocation_after]
+      properties:
+        receipt_id: { $ref: '#/components/schemas/CanonicalId' }
+        pieces: { $ref: '#/components/schemas/ReceiptPieces', description: Physical pieces posted, all allocated to the linked waiting row. }
+        posted_at: { type: string, format: date-time }
+        allocation_after: { $ref: '#/components/schemas/PurchaseReceiptAllocation' }
+    PurchaseReceiptAllocation:
+      type: object
+      additionalProperties: false
+      required: [plan_id, purchase_order_id, purchase_line_id, sku, revision, unit, through_receipt_sequence, receipt_allocated_pieces, line_open_pieces, plan_held_pieces, plan_remaining_shortage_pieces]
+      properties:
+        plan_id: { $ref: '#/components/schemas/CanonicalId' }
+        purchase_order_id: { $ref: '#/components/schemas/CanonicalId' }
+        purchase_line_id: { $ref: '#/components/schemas/CanonicalId' }
+        sku: { type: string, pattern: '^[A-Z0-9-]{1,64}(?![\s\S])' }
+        revision:
+          oneOf:
+            - { type: string, pattern: '^[A-Za-z0-9._-]{1,32}(?![\s\S])' }
+            - { type: 'null' }
+        unit: { type: string, const: EA }
+        through_receipt_sequence:
+          type: integer
+          minimum: 1
+          maximum: 1000000
+          description: Last committed receipt sequence on this purchase line.
+        receipt_allocated_pieces: { $ref: '#/components/schemas/ReceiptPieces', description: Cumulative pieces allocated by committed receipts for this line. }
+        line_open_pieces: { $ref: '#/components/schemas/PlanQuantity', description: Immutable ordered pieces minus committed receipts for this line. }
+        plan_held_pieces: { $ref: '#/components/schemas/PlanQuantity', description: Current pieces held for the plan row, including original holds. }
+        plan_remaining_shortage_pieces: { $ref: '#/components/schemas/PlanQuantity', description: Current unmet demand for the linked plan row; not the immutable original uncovered quantity. }
+    Quantity: { type: string, pattern: '^(?:0|[1-9][0-9]{0,2}|1000)(?![\s\S])' }
+    Reservation:
+      type: object
+      required: [order_id, line_id, warehouse_id, sku, product_revision, unit, requested, reserved, outstanding, source_event_id]
+      properties:
+        order_id: { type: string, format: uuid }
+        line_id: { type: string, format: uuid }
+        warehouse_id: { type: string, format: uuid }
+        sku: { type: string }
+        product_revision: { type: string }
+        unit: { const: EA }
+        requested: { $ref: '#/components/schemas/Quantity' }
+        reserved: { $ref: '#/components/schemas/Quantity' }
+        outstanding: { $ref: '#/components/schemas/Quantity' }
+        source_event_id: { type: string, format: uuid }
+    PlanQuantity: { type: string, pattern: '^(?:0|[1-9][0-9]{0,5}|1000000)(?![\s\S])' }
+    MaterialPlan:
+      type: object
+      required: [id, order_id, line_id, warehouse_id, source_event_id, sku, product_revision, pieces, unit, created_at, production, materials]
+      properties:
+        id: { type: string, format: uuid }
+        order_id: { type: string, format: uuid }
+        line_id: { type: string, format: uuid }
+        warehouse_id: { type: string, format: uuid }
+        source_event_id: { type: string, format: uuid }
+        sku: { type: string }
+        product_revision: { type: string }
+        pieces: { type: string, pattern: '^(?:[1-9][0-9]{0,2}|1000)(?![\s\S])' }
+        unit: { const: EA }
+        created_at: { type: string, format: date-time }
+        production:
+          description: Root and nested assemblies. Uncovered pieces are recommended for manufacture.
+          type: array
+          maxItems: 257
+          items: { $ref: '#/components/schemas/PlanRow' }
+        materials:
+          description: Leaf materials. Uncovered pieces are recommended for purchase.
+          type: array
+          maxItems: 256
+          items: { $ref: '#/components/schemas/PlanRow' }
+    PlanRow:
+      type: object
+      required: [sku, revision, requested, reserved, uncovered]
+      properties:
+        sku: { type: string }
+        revision: { type: [string, 'null'] }
+        requested: { $ref: '#/components/schemas/PlanQuantity' }
+        reserved: { $ref: '#/components/schemas/PlanQuantity' }
+        uncovered: { $ref: '#/components/schemas/PlanQuantity' }

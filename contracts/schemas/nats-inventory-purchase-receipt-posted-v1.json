@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$ref": "nats-envelope-v1.json",
+  "title": "Proposed Inventory purchase receipt posted v1",
+  "description": "A new root fact emitted once for an Inventory receipt that committed with full allocation to the waiting plan row.",
+  "required": ["tenantId", "organizationId", "actor"],
+  "not": {"required": ["causationId"]},
+  "$defs": {
+    "id": {"$ref": "nats-envelope-v1.json#/$defs/id", "maxLength": 36}
+  },
+  "properties": {
+    "messageType": {"pattern": "^v1\\.business\\.[0-9a-f-]{36}\\.inventory\\.event\\.purchase-receipt\\.posted\\.v1(?![\\s\\S])"},
+    "messageId": {"$ref": "#/$defs/id"},
+    "correlationId": {"$ref": "#/$defs/id"},
+    "protocolVersion": {"const": "1.0.0"},
+    "schemaVersion": {"const": "1.0.0"},
+    "sourceService": {"const": "erp4us.inventory"},
+    "tenantId": {"$ref": "#/$defs/id"},
+    "organizationId": {"$ref": "#/$defs/id"},
+    "actor": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {"$ref": "#/$defs/id"},
+        "kind": {"enum": ["user", "service", "agent"]}
+      }
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["receiptId", "planId", "purchaseOrderId", "purchaseLineId", "sku", "revision", "unit", "pieces", "receiptSequence"],
+      "properties": {
+        "receiptId": {"$ref": "#/$defs/id"},
+        "planId": {"$ref": "#/$defs/id"},
+        "purchaseOrderId": {"$ref": "#/$defs/id"},
+        "purchaseLineId": {"$ref": "#/$defs/id"},
+        "sku": {"type": "string", "minLength": 1, "maxLength": 64, "not": {"pattern": "[^A-Z0-9-]"}},
+        "revision": {
+          "anyOf": [
+            {"type": "null"},
+            {"type": "string", "minLength": 1, "maxLength": 32, "not": {"pattern": "[^A-Za-z0-9._-]"}}
+          ]
+        },
+        "unit": {"const": "EA"},
+        "pieces": {"type": "string", "pattern": "^(?:[1-9][0-9]{0,5}|1000000)(?![\\s\\S])"},
+        "receiptSequence": {"type": "integer", "minimum": 1, "maximum": 1000000}
+      }
+    }
+  }
+}

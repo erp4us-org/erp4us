@@ -7,6 +7,32 @@ servers:
 security:
   - AccessToken: []
 paths:
+  /v1/session:
+    get:
+      operationId: getVerifiedSession
+      description: Return the operator-configured actor and grants for this verified bearer. Does not accept a tenant or organization selector.
+      responses:
+        '200':
+          description: Actor and its organization-scoped permission grants. Not cacheable.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [actor_id, grants]
+                properties:
+                  actor_id: { type: string, format: uuid }
+                  platform_permissions: { type: array, items: { type: string } }
+                  grants:
+                    type: array
+                    items:
+                      type: object
+                      required: [tenant_id, organization_id, permissions]
+                      properties:
+                        tenant_id: { type: string, format: uuid }
+                        organization_id: { type: string, format: uuid }
+                        permissions: { type: array, items: { type: string } }
+        '401': { description: Missing or invalid access token }
+        '403': { description: No operator grant policy for the principal }
   /v1/articles:register:
     parameters:
       - $ref: '#/components/parameters/Tenant'
@@ -116,6 +142,37 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/Problem' }
+        '503': { $ref: '#/components/responses/Problem' }
+  /v1/partners:
+    get:
+      operationId: listPartners
+      description: List partners in the authorized organization ordered by code. The cursor is exclusive and scoped by the same filters.
+      parameters:
+        - $ref: '#/components/parameters/Tenant'
+        - $ref: '#/components/parameters/Organization'
+        - in: query
+          name: role
+          schema: { type: string, enum: [customer, supplier] }
+        - in: query
+          name: after
+          schema: { type: string, pattern: '^[A-Z0-9-]{1,32}$' }
+        - in: query
+          name: limit
+          schema: { type: integer, minimum: 1, maximum: 50, default: 25 }
+      responses:
+        '200':
+          description: Scoped page. Null cursor indicates the final page.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, next_after]
+                properties:
+                  items: { type: array, items: { $ref: '../schemas/partner-v1.json' } }
+                  next_after: { type: [string, 'null'] }
+        '400': { description: 'Invalid scope, filter, or cursor' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
         '503': { $ref: '#/components/responses/Problem' }
   /v1/partners:register:
     parameters:

@@ -37,8 +37,14 @@ services:
       ERP4US_ISSUER_JWKS: /etc/erp4us/issuer-jwks.json
       MASTER_DATA_MONGODB_URI: mongodb://master_data_app:${DEV_MASTER_DATA_PASSWORD:?Run sh scripts/init-dev.sh first}@mongo:27017/master_data?replicaSet=erp4us&serverSelectionTimeoutMS=3000&connectTimeoutMS=3000
     volumes:
-      - ./.dev-auth/identity-policy.json:/etc/erp4us/identity-policy.json:ro
-      - ./.dev-auth/issuer-jwks.json:/etc/erp4us/issuer-jwks.json:ro
+      - type: bind
+        source: ${ERP4US_IDENTITY_DIR:-./.dev-auth}/identity-policy.json
+        target: /etc/erp4us/identity-policy.json
+        read_only: true
+      - type: bind
+        source: ${ERP4US_IDENTITY_DIR:-./.dev-auth}/issuer-jwks.json
+        target: /etc/erp4us/issuer-jwks.json
+        read_only: true
     depends_on:
       mongo:
         condition: service_healthy

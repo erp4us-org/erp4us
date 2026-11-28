@@ -1,0 +1,25 @@
+name: Preview identity image advisories
+on:
+  pull_request:
+    paths:
+      - 'compose.preview-identity.yaml'
+      - '.github/workflows/preview-identity-image.yml'
+      - 'scripts/install-dependency-scanner.sh'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  preview-identity-image:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with: { persist-credentials: false }
+      - name: Scan the pinned Keycloak image, including Java libraries
+        run: |
+          image=$(docker compose -f compose.preview-identity.yaml config --images)
+          sh scripts/install-dependency-scanner.sh trivy "$RUNNER_TEMP/tools"
+          "$RUNNER_TEMP/tools/trivy" image --image-src remote --scanners vuln --severity HIGH,CRITICAL \
+            --format json --output "$RUNNER_TEMP/preview-identity.json" "$image"
+          "$RUNNER_TEMP/tools/trivy" convert --format table "$RUNNER_TEMP/preview-identity.json"
+          jq -e '[.Results[].Vulnerabilities[]? | select((.FixedVersion // "") != "")] | length == 0' "$RUNNER_TEMP/preview-identity.json"

@@ -1,0 +1,32 @@
+# Diagnose the local preview runtime
+
+**Status: proposed for [#122](https://github.com/erp4us-org/erp4us/issues/122).** The goal is to answer three distinct questions: which expected services are present, which applications are ready, and what bounded diagnostic events explain a failure. This is not a controller, deployment reconciliation, terminal, or generic infrastructure UI. The existing [application observation adapter](../adr/0007-preview-application-observation.md) remains available independently.
+
+## Runtime observations
+
+Start with a fixed, operator-selected preview Compose project and an explicit list of its long-running services. A stopped Manufacturing container is **present, exited** even if its HTTP probe is unreachable. A missing service is **absent** only when an authenticated platform operator reads a fresh, complete scan that found no matching container. An expired scan is **stale**, and a missing, invalid or failed scan is **unavailable**; neither means absent. Do not turn a broker or heartbeat observation into a runtime fact. A healthy container in a second Compose project, a one-shot database initializer, and tenant users with ordinary administration rights are not observations or operators of this project.
+
+The [host observer proposal](https://github.com/erp4us-org/erp4us/issues/122#issuecomment-7236971940) is the smallest candidate for real runtime evidence. An opt-in trusted host operator runs an observer on that same machine; it uses only the operator's existing runtime privilege and has **no listener or command channel**. Treat output fields as data, check the fixed project and allowlisted service labels, exclude one-shots and foreign projects, and publish only service keys, bounded counts and lifecycle codes. Do not export container IDs, labels, commands, paths or environment values.
+
+The observer would replace a versioned bounded artifact atomically in a dedicated host-owned directory. The Diagnostics API receives the directory read-only and no Docker socket, Docker API, proxy, elevated group, or host command path. Reject unknown shapes, excess input, source mismatch and ambiguous observations rather than rendering them as known runtime states. The UI sees a server-authorized response, never the host files, socket or Docker credentials. The artifact reader must not let a caller choose a filename, Compose project or target. Without a reviewed observer and a fresh complete artifact, the UI must not show fabricated runtime state.
+
+The [proposed HTTP view](../../contracts/openapi/diagnostics-runtime-preview-v1.yaml) and its [browser fixture](../../ui/tests/diagnostics-preview.spec.ts) demonstrate the statuses and the separate read grants for an initial three-service subset. They do not enable server endpoints, provision grants, or observe any container. The client limits record count and response bytes and never renders an upstream message body as a log line.
+
+## Diagnostic logs
+
+As a separate read capability, accept only reviewed records from specific services (for example Manufacturing startup and Article Relay delivery backoff). On the host, project to time, service key, severity and an allowlisted diagnostic code before writing anything retained. Drop free-form, oversized, unknown or malformed records rather than trying to redact arbitrary stdout. In the browser, translate known codes; never forward raw messages, business IDs/payloads, credentials or original paths.
+
+Proposed local limits: 24 hours or 5 MiB retained in total, whichever cap is reached first, and at most 100 sanitized entries per page. Use time and an opaque cursor with a visible gap on reset, expiry or collector outage. Bounded polling while the log view is open supplies near-live updates without a new queue or long-lived stream. Require independent, explicit platform rights for runtime observations and logs; a tenant administrator or health-only platform reader gets neither by implication. Authorize every query and clear data on session removal or denial. These grant assignments, artifact boundary and retention limits still need review.
+
+## Restart is a separate decision
+
+**First delivery:** an authorized operator still restarts services through existing host tools; Diagnostics shows the observed exit and recovery. This keeps the new UI and read path incapable of changing the host. It works on a one-machine deployment without requiring a deployment controller or additional daemon with command ingress.
+
+If operators later need an in-app restart, review a **separate opt-in host execution boundary**, not a feature of the read-only observer. Candidate requirements: a distinct verified platform operation grant, an explicit confirmation bound to an allowlisted service key and the fixed local project, rate limits, an idempotent operation reference, minimal audit, and a maximum of one narrowly scoped restart. The implementation must reject arbitrary container IDs, user flags, commands, paths and targets; it must not allow deploy, recreate, scale, network or secret operations. Changes to stateful or identity infrastructure need separate review rather than an implicitly broad `restart` permission. A command acknowledgement would not stand in for recovery; only the observed runtime and application status show it. The first design has **no restart endpoint, queue, grant assignment or UI action**.
+
+## Proof before activation
+
+- Confirm the artifact reports an existing stopped container, a removed expected container, collector failure and stale results distinctly. A foreign project, unlisted service and one-shot job never appear. Prove independent app-readiness and runtime transitions.
+- Start the log view and capture a historical and a later real diagnostic code. Check cursor expiry, retained window, unavailable state and bounded use under burst load. Inject synthetic secret, payload and malformed/oversized canaries; none reaches retained data, API or UI.
+- Deny wrong-audience tokens, missing platform grants and tenant-only access; reject unsupported target selectors. Prove health still works without an observer. No security-critical authority is derived from UI visibility or the presence of a host file.
+- Do not enable host observation before reviewing exact local runtime permissions, artifact ownership, fixed service list, retention/gaps, and rollback. A fixture UI or sample OpenAPI response on its own proves nothing about a running container. Do not activate any restart option without a separate approved authority and recovery decision.

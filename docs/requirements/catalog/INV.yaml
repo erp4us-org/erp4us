@@ -35,12 +35,17 @@
   - 58
   - 91
   - 93
-  prs: []
+  prs:
+  - 120
   contracts:
   - contracts/schemas/cancel-stock-line-v1.json
   - contracts/schemas/confirmed-stock-line-v1.json
+  - contracts/openapi/inventory-v1.yaml
+  - contracts/schemas/nats-sales-order-confirmed-v1.json
   tests:
   - tests/integration/inventory.py
+  - tests/integration/sales_inventory.py
+  - tests/integration/material_plan.py
   evidence: []
   questions:
   - Which other order types require a different allocation policy?

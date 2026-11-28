@@ -4,7 +4,7 @@
 
 erp4us aims to make business software composable: organizations should be able to run their own ERP and combine independently maintained business services without handing over their data or depending on any particular cloud or AI provider. People and agents operate on the same business commands, under the same authorization and audit rules. An open protocol and semantic models make those commands discoverable without exposing a service's database.
 
-**Status: foundation, not an ERP release.** Master Data accepts verified OAuth access tokens and enforces operator-managed tenant and organization grants. The Angular workspace uses the synthetic local scope. An optional JetStream demo delivers registration events to a separate receipt service for that scope only. Do not deploy the Compose fixture publicly or enter real business data. Project materials are licensed under [Apache-2.0](LICENSE).
+**Status: integration preview, not an ERP release.** Master Data accepts verified OAuth access tokens and enforces tenant and organization grants. The [First Working ERP integration](docs/development/first-working-erp.md) adds an isolated Keycloak demo login and a stored NovaMotion bill-of-materials preview. The full customer-order-to-shipment process is not yet available. Do not deploy publicly or use real business data. Project materials are licensed under [Apache-2.0](LICENSE).
 
 ## Run the first slice
 
@@ -37,7 +37,7 @@ python3 tests/integration/delivery.py
 docker compose -f compose.yaml -f compose.delivery.yaml down
 ```
 
-The delivery check deliberately stops the broker, forces receipt writes to fail, and replays a synthetic event. Do not run it against a shared stack. If you have an older `.env`, keep its existing credentials and append independently generated `openssl rand -hex 32` values for any missing keys: `DEV_NATS_ADMIN_PASSWORD`, `DEV_NATS_RELAY_PASSWORD`, `DEV_NATS_RECEIPTS_PASSWORD`, `DEV_NATS_REPLAY_PASSWORD`, `DEV_NATS_CONFIG_READER_PASSWORD` and `DEV_RECEIPTS_MONGO_PASSWORD`. Neither the broker nor MongoDB is published to the host.
+The delivery check deliberately stops the broker, forces receipt writes to fail, and replays a synthetic event. Do not run it against a shared stack. If you have an older `.env`, keep its existing credentials and append independently generated `openssl rand -hex 32` values for any missing keys required by the Compose overlays. See `scripts/init-dev.sh` for the list. Neither the broker nor MongoDB is published to the host.
 
 See the [heartbeat operations guide](infrastructure/nats/README.md#revisioned-relay-heartbeat-local-reference) to query or change the relay heartbeat without rebuilding the service. Read the [NATS wire specification](docs/specifications/nats-messaging.md) and the [cutover runbook](infrastructure/nats/README.md#cutover-from-articles) before upgrading a stack with an `ARTICLES` stream. On the demo stack, after fixing a receipt persistence failure, take the numeric suffix from the retry-exhausted quarantine `_id` (`ERP4US_BUSINESS_EVENTS_V1:<sequence>`) and run:
 

@@ -8,7 +8,9 @@ pub use subject::{Kind, Layer, Route, Scope, Subject};
 pub use wire::{Actor, Contract, Delivery, Envelope, valid_traceparent};
 // Native types needed for provisioning, pull-consumer lifecycle and explicit ACKs.
 pub use async_nats::jetstream::{
-    AckKind, ErrorCode, consumer, context::GetStreamErrorKind, stream,
+    AckKind, ErrorCode, consumer,
+    context::{AccountErrorKind, GetStreamErrorKind},
+    stream,
 };
 pub use async_nats::{
     ConnectOptions, Event as ConnectionEvent, HeaderMap, Message, Subscriber, connection::State,

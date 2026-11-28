@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "tenant_id": "ddcae139-c1e8-47d2-8b48-349cb6f30ce5",
+  "organization_id": "3e793fb5-75a7-45f6-8f66-45a58fcec674",
+  "policy_id": "b3c1837d-138f-4e22-9b6a-c450aced37bc",
+  "revision": 1,
+  "currency": "EUR",
+  "require_distinct_approvers": true,
+  "stages": [
+    {"key": "department", "minimum_amount": "0.00"},
+    {"key": "budget", "minimum_amount": "1500.00"}
+  ]
+}

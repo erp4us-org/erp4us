@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Procurement budget approval policy v1",
+  "description": "Trusted deployment policy, not a browser command or a grant. Runtime validation additionally requires a zero first threshold, strictly ascending thresholds and unique stage keys.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "tenant_id", "organization_id", "policy_id", "revision", "currency", "require_distinct_approvers", "stages"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "tenant_id": {"$ref": "#/$defs/id"},
+    "organization_id": {"$ref": "#/$defs/id"},
+    "policy_id": {"$ref": "#/$defs/id"},
+    "revision": {"type": "integer", "minimum": 1, "maximum": 2147483647},
+    "currency": {"const": "EUR"},
+    "require_distinct_approvers": {"type": "boolean"},
+    "stages": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 8,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["key", "minimum_amount"],
+        "properties": {
+          "key": {"type": "string", "pattern": "^[a-z][a-z0-9-]{0,31}(?![\\s\\S])"},
+          "minimum_amount": {"type": "string", "pattern": "^(?:0|[1-9][0-9]{0,14})\\.[0-9]{2}(?![\\s\\S])"}
+        }
+      }
+    }
+  },
+  "$defs": {
+    "id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(?![\\s\\S])",
+      "not": {"const": "00000000-0000-0000-0000-000000000000"}
+    }
+  }
+}

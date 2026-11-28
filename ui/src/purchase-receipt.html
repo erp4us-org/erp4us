@@ -1,0 +1,95 @@
+@if (visible()) {
+  <section class="receiving" aria-labelledby="purchase-receiving">
+    <h3 id="purchase-receiving">{{ t()('receiptTitle') }}</h3>
+    <p>{{ t()('receiptIntro') }}</p>
+    @let state = view();
+    @let lot = pending();
+    <erp-feedback [message]="state.denied ? t()('receiptDenied') : state.feedback ? t()(state.feedback) : ''" />
+
+    @if (!state.denied) {
+      @if (!lot && canDiscover() && !state.lines.length) {
+        <button type="button" (click)="discover()" [disabled]="!!state.busy">
+          <svg lucideSearch aria-hidden="true"></svg>{{ t()('receiptDiscover') }}
+        </button>
+      }
+      @if (state.lines.length && !lot) {
+        <label for="receipt-line">{{ t()('receiptChooseLine') }}</label>
+        <select id="receipt-line" #lineOption (change)="select(lineOption.value)" [disabled]="!!state.busy">
+          <option value="" [selected]="!state.selected">{{ t()('receiptSelectPlaceholder') }}</option>
+          @for (line of state.lines; track lineKey(line)) {
+            <option [value]="lineKey(line)" [selected]="state.selected === line">
+              {{ $index + 1 }}. {{ line.sku }}{{ line.revision ? ' · ' + line.revision : '' }} — {{ line.ordered_pieces }} {{ line.unit }}
+            </option>
+          }
+        </select>
+      }
+      @if (selected(); as line) {
+        <p><strong>{{ line.sku }}{{ line.revision ? ' · ' + line.revision : '' }}</strong>
+          · {{ t()('purchaseOrderedQuantity') }}: {{ line.ordered_pieces }} {{ line.unit }}</p>
+        <p>{{ t()('purchaseOrderId') }}: {{ line.purchase_order_id }}<br>
+          {{ t()('purchaseLineId') }}: {{ line.purchase_line_id }}</p>
+
+        @if (state.posted; as receipt) {
+          <section aria-labelledby="receipt-original">
+            <h4 id="receipt-original">{{ t()('receiptOriginal') }}</h4>
+            <p>{{ t()('receiptOriginalHelp') }}</p>
+            <p>{{ t()('receiptId') }}: {{ receipt.receipt_id }} · {{ t()('receiptPostedPieces') }}: {{ receipt.pieces }} EA ·
+              <time [attr.datetime]="receipt.posted_at">{{ receipt.posted_at }}</time></p>
+            <erp-receipt-allocation [allocation]="receipt.allocation_after" />
+          </section>
+        }
+        @if (canRead()) {
+          <section aria-labelledby="receipt-current">
+            <h4 id="receipt-current">{{ t()('receiptCurrent') }}</h4>
+            <erp-feedback [message]="t()(state.readFeedback)" />
+            @if (state.current; as current) {
+              <erp-receipt-allocation [allocation]="current" />
+            }
+            <button type="button" (click)="read()" [disabled]="!!state.busy || !!state.review">
+              <svg lucideRefreshCw aria-hidden="true"></svg>{{ t()('receiptRefresh') }}
+            </button>
+          </section>
+        } @else {
+          <p>{{ t()('receiptNoReadGrant') }}</p>
+        }
+
+        @if (lot) {
+          <section aria-labelledby="receipt-pending">
+            <h4 id="receipt-pending">{{ t()('receiptPending') }}</h4>
+            <p>{{ t()('receiptId') }}: {{ lot.intent.receipt_id }} · {{ lot.intent.pieces }} EA</p>
+            <p>{{ t()(lot.needsOperator ? 'receiptChanged' : 'receiptPendingHelp') }}</p>
+            @if (canPost() && !lot.needsOperator) {
+              <button type="button" (click)="retry()" [disabled]="!!state.busy">
+                <svg lucideRefreshCw aria-hidden="true"></svg>{{ t()('receiptRetry') }}
+              </button>
+            }
+          </section>
+        } @else if (canPost() && canDiscover()) {
+          @if (state.review; as pieces) {
+            <section aria-labelledby="receipt-confirm">
+              <h4 id="receipt-confirm">{{ t()('receiptConfirmTitle') }}</h4>
+              <p><strong>{{ line.sku }}{{ line.revision ? ' · ' + line.revision : '' }} — {{ pieces }} EA</strong></p>
+              <p>{{ t()('receiptConfirmHelp') }}</p>
+              <div class="actions">
+                <button #confirmButton type="button" class="primary" (click)="confirm()">
+                  <svg lucideCheck aria-hidden="true"></svg>{{ t()('receiptConfirm') }}
+                </button>
+                <button type="button" (click)="cancelReview()">
+                  <svg lucideX aria-hidden="true"></svg>{{ t()('receiptCancel') }}
+                </button>
+              </div>
+            </section>
+          } @else {
+            <label for="receipt-pieces">{{ t()('receiptPiecesLabel') }}</label>
+            <p id="receipt-pieces-limit">{{ t()('receiptPiecesLimit') }}</p>
+            <input id="receipt-pieces" type="text" inputmode="numeric" aria-describedby="receipt-pieces-limit"
+              #piecesInput [value]="state.draft" (input)="changePieces(piecesInput.value)" [disabled]="!!state.busy">
+            <button #reviewButton type="button" (click)="review()" [disabled]="!!state.busy || !validPieces(state.draft)">
+              <svg lucideClipboardList aria-hidden="true"></svg>{{ t()('receiptReview') }}
+            </button>
+          }
+        }
+      }
+    }
+  </section>
+}

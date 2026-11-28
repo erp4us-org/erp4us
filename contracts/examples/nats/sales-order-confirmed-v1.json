@@ -1,0 +1,22 @@
+{
+  "messageType": "v1.business.ddcae139-c1e8-47d2-8b48-349cb6f30ce5.sales.event.order.confirmed.v1",
+  "messageId": "ae27188c-c804-4b3c-a85a-678d1f570dba",
+  "correlationId": "ae27188c-c804-4b3c-a85a-678d1f570dba",
+  "protocolVersion": "1.0.0",
+  "schemaVersion": "1.0.0",
+  "serviceVersion": "0.1.0",
+  "timestamp": "2026-11-27T09:00:00Z",
+  "sourceService": "erp4us.sales",
+  "tenantId": "ddcae139-c1e8-47d2-8b48-349cb6f30ce5",
+  "organizationId": "3e793fb5-75a7-45f6-8f66-45a58fcec674",
+  "actor": {"id": "142a290f-4bbc-438e-aefe-e3697a8bcd16", "kind": "user"},
+  "payload": {
+    "orderId": "acf27f04-dfdf-445b-b38d-55514cc9c433",
+    "revision": 2,
+    "lineId": "5b83b773-f8b2-42e0-b995-64d565c0ae2d",
+    "sku": "NM-1000",
+    "productRevision": "A",
+    "unit": "EA",
+    "pieces": "10"
+  }
+}
